@@ -66,7 +66,7 @@ struct ofxImGuiContext {
 		ofxImGuiContext( const ofxImGuiContext& ) = delete;
 		ofxImGuiContext& operator=( const ofxImGuiContext& ) = delete;
 
-		// Allow move contructor & move assign
+		// Allow move constructor & move assign
 		explicit ofxImGuiContext(ofxImGuiContext&& other) noexcept : imguiContext{other.imguiContext}{
 			other.imguiContext = nullptr;
 			//other. = false;
@@ -115,13 +115,13 @@ struct ofxImGuiContext {
 
 namespace ofxImGui
 {
-	enum SetupState : unsigned char {
-		Error = 0, // Keep to 0 so that it evaluates to false ?
-		Slave = 1 << 1,
-		Master = 1 << 2,
-		// Success flag
-		Success = Slave | Master, // Use like: if(mState & Success)
-	};
+    enum SetupState : unsigned char {
+        SetupError = 0, // Keep to 0 so that it evaluates to false ?
+        SetupSlave = 2,
+        SetupMaster = 4,
+        SetupSuccess = 6, // Use like: if(mState & Success)
+    };
+
 	std::ostream& operator<<(std::ostream& os, const SetupState& _state);
 
 	class Gui
@@ -176,7 +176,7 @@ namespace ofxImGui
 
     private:
         void render();
-		static void initialiseForWindow();
+		//static void initialiseForWindow();
 
 //#if defined (OFXIMGUI_FORCE_OF_BACKEND)
 //        EngineOpenFrameworks engine;

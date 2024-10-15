@@ -88,13 +88,13 @@ namespace ofxImGui
 #ifdef OFXIMGUI_DEBUG
             ofLogWarning("Gui::setup()") << "This Gui instance is already setup, you are calling it twice ! (ignoring this 2nd call)";
 #endif
-			return isContextOwned ? SetupState::Master : SetupState::Slave;
+			return isContextOwned ? SetupState::SetupMaster : SetupState::SetupSlave;
         }
 
         // Curwindow cannot be null
 		if(_ofWindow==nullptr){
 			ofLogError("Gui::setup()") << "The provided ofAppBaseWindow pointer is null, cannot continue setup !";
-			return SetupState::Error;
+			return SetupState::SetupError;
         }
 
 		// Grab existing ImGui Context
@@ -129,7 +129,7 @@ namespace ofxImGui
 			auto createdContext = imguiContexts.emplace(std::piecewise_construct, std::forward_as_tuple(_ofWindow.get()), std::forward_as_tuple(_ofWindow));
 			if(!createdContext.second){ // Failed creating ?
 				ofLogError("Gui::setup()") << "Couldn't create a context for this window !";
-				return SetupState::Error;
+				return SetupState::SetupError;
 			}
 			context = &createdContext.first->second;
 			context->slaveCount ++; // Master counts as a slave too ;)
@@ -161,7 +161,7 @@ namespace ofxImGui
 #ifdef OFXIMGUI_DEBUG
             ofLogVerbose("Gui::setup()") << "Context is not owned, skipping some settings and not binding the engine again.";
 #endif
-			return SetupState::Slave;
+			return SetupState::SetupSlave;
         }
 
 		// Master may set more settings
@@ -184,7 +184,7 @@ namespace ofxImGui
 			setTheme((BaseTheme*)defaultTheme);
 		}
 
-		return SetupState::Master;
+		return SetupState::SetupMaster;
 	}
 
 	//--------------------------------------------------------------
@@ -333,7 +333,7 @@ namespace ofxImGui
 
 		ImGui::SetCurrentContext(context->imguiContext);
 		ImGuiIO& io = ImGui::GetIO();
-        std::string filePath = ofFilePath::getAbsolutePath(fontPath);
+        std::string filePath = ofFilePath::getAbsolutePath(fontPath).generic_string();
 
         // ensure default font gets loaded once
         if(io.Fonts->Fonts.size()==0) io.Fonts->AddFontDefault();

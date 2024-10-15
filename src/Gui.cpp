@@ -409,7 +409,10 @@ namespace ofxImGui
 
 		ImGui::SetCurrentContext(context->imguiContext);
 		ImGuiIO& io = ImGui::GetIO();
-        std::string filePath = ofFilePath::getAbsolutePath(fontPath).generic_string();
+
+		// Pass in a good path, this addon is used in different versions of OF
+		// Especially the raspberry seems to be a version behind. Master Branch / Release 
+		std::string filePath = fontPath; //ofFilePath::getAbsolutePath(fontPath);
 
         ImFont* font = io.Fonts->AddFontFromFileTTF(filePath.c_str(), fontSize, _fontConfig, _glyphRanges);
 

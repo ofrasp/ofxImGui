@@ -8,6 +8,13 @@
 
 #pragma once
 
+#ifndef __has_feature         // Optional of course
+  #define __has_feature(x) 0  // Compatibility with non-clang compilers
+#endif
+#ifndef __has_extension
+  #define __has_extension __has_feature // Compatibility with pre-3.0 compilers
+#endif
+
 // Hacky but simple :)
 // Injects ARC support by defining glfwGetCocoaWindow something else
 #if defined(__OBJC__) && __has_feature(objc_arc)

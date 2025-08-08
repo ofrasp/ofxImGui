@@ -33,17 +33,16 @@ const char * ofxImGui::GetUniqueName(ofAbstractParameter& parameter)
 //--------------------------------------------------------------
 const char * ofxImGui::GetUniqueName(const std::string& candidate)
 {
-	std::string result = candidate;
-	if( !windowOpen.usedNames.empty() ) {
-		while (std::find(windowOpen.usedNames.top().begin(), windowOpen.usedNames.top().end(), result) != windowOpen.usedNames.top().end())
-		{
-			// Note: Add a space to (invisibly) differenciate the parameter name from another one with the same name
-			result += " ";
-		}
+	if (windowOpen.usedNames.empty())
+	{
+		return candidate.c_str();
 	}
-	else {
-		// Create top-level stack in window-less zones. See issue #6.
-		windowOpen.usedNames.push(std::vector<std::string>());
+
+	std::string result = candidate;
+	while (std::find(windowOpen.usedNames.top().begin(), windowOpen.usedNames.top().end(), result) != windowOpen.usedNames.top().end())
+	{
+		// Note: Add a space to (invisibly) differenciate the parameter name from another one with the same name
+		result += " ";
 	}
 	windowOpen.usedNames.top().push_back(result);
 	return windowOpen.usedNames.top().back().c_str();

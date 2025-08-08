@@ -35,6 +35,7 @@ namespace ofxImGui
 		ofVec2f windowPos;
 		ofVec2f windowSize;
 		bool lockPosition;
+		bool lockSize;
 		
 		bool mouseOverGui;
 		bool windowBlock;

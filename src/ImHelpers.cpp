@@ -5,6 +5,7 @@ ofxImGui::Settings::Settings()
 	: windowPos(kImGuiMargin, kImGuiMargin)
 	, windowSize(ofVec2f::zero())
 	, lockPosition(false)
+	, lockSize(false)
 	, mouseOverGui(false)
 	, windowBlock(false)
 	, treeLevel(0)
@@ -88,7 +89,7 @@ bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, bool col
 	windowOpen.usedNames.push(std::vector<std::string>());
 
 	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(settings.windowSize, settings.lockSize ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
 	//ImGui::SetNextWindowCollapsed(collapse, ImGuiCond_Appearing);
 	return ImGui::Begin(name.c_str(), open, /*ImGuiWindowFlags_NoSavedSettings |*/ /*ImGuiWindowFlags_AlwaysAutoResize |*/ (collapsible ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoCollapse));
 }
@@ -107,8 +108,8 @@ bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, ImGuiWin
 	// Push a new list of names onto the stack.
 	windowOpen.usedNames.push(std::vector<std::string>());
 
-	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition? ImGuiCond_Always : ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(settings.windowSize, settings.lockSize ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
 	if(!(flags & ImGuiWindowFlags_NoCollapse)) ImGui::SetNextWindowCollapsed(true, ImGuiCond_Appearing); // Initially collapse collapsible windows
 	return ImGui::Begin(name.c_str(), open, flags);
 }

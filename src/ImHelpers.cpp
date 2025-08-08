@@ -472,8 +472,13 @@ bool ofxImGui::AddParameter(ofParameter<ofColor>& parameter, bool alpha)
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::AddParameter(ofParameter<std::string>& parameter, size_t maxChars, bool multiline)
+bool ofxImGui::AddParameter(ofParameter<std::string>& parameter, size_t maxChars, bool multiline, float width)
 {
+	if (width > 0.0f)
+	{
+		const float labelWidth = ImGui::CalcTextSize(parameter.getName().c_str()).x;
+		ImGui::SetNextItemWidth(width - labelWidth);
+	}
 	auto tmpRef = parameter.get();
 	char * cString = new char[maxChars];
 	strcpy(cString, tmpRef.c_str());
@@ -507,9 +512,11 @@ bool ofxImGui::AddParameter(ofParameter<void>& parameter, float width)
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::AddRadio(ofParameter<int>& parameter, std::vector<std::string> labels, int columns)
+bool ofxImGui::AddRadio(ofParameter<int>& parameter, std::vector<std::string> labels, int columns, float width)
 {
 	auto uniqueName = GetUniqueName(parameter);
+	const float labelWidth = ImGui::CalcTextSize(uniqueName).x;
+	const float columnWidth = (width) / columns;
 	ImGui::Text("%s", uniqueName);
 	auto result = false;
 	auto tmpRef = parameter.get();
@@ -518,6 +525,10 @@ bool ofxImGui::AddRadio(ofParameter<int>& parameter, std::vector<std::string> la
 		ImGui::Columns(columns);
 		for (size_t i = 0; i < labels.size(); ++i)
 		{
+			if (width > 0.0f)
+			{
+				ImGui::SetColumnWidth(-1, columnWidth);
+			}
 			result |= ImGui::RadioButton(GetUniqueName(labels[i]), &tmpRef, i);
 			ImGui::NextColumn();
 		}
@@ -532,8 +543,13 @@ bool ofxImGui::AddRadio(ofParameter<int>& parameter, std::vector<std::string> la
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::AddCombo(ofParameter<int>& parameter, std::vector<std::string> labels)
+bool ofxImGui::AddCombo(ofParameter<int>& parameter, std::vector<std::string> labels, float width)
 {
+	if (width > 0.0f)
+	{
+		const float labelWidth = ImGui::CalcTextSize(parameter.getName().c_str()).x;
+		ImGui::SetNextItemWidth(width - labelWidth);
+	}
 	auto result = false;
 	auto tmpRef = parameter.get();
 	if (ImGui::BeginCombo(GetUniqueName(parameter), labels.at(parameter.get()).c_str()))
@@ -562,8 +578,13 @@ bool ofxImGui::AddCombo(ofParameter<int>& parameter, std::vector<std::string> la
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::AddStepper(ofParameter<int>& parameter, int step, int stepFast)
+bool ofxImGui::AddStepper(ofParameter<int>& parameter, int step, int stepFast, float width)
 {
+	if (width > 0.0f)
+	{
+		const float labelWidth = ImGui::CalcTextSize(parameter.getName().c_str()).x;
+		ImGui::SetNextItemWidth(width - labelWidth);
+	}
 	auto tmpRef = parameter.get();
 	if (ImGui::InputInt(GetUniqueName(parameter), &tmpRef, step, stepFast))
 	{

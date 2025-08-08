@@ -80,19 +80,19 @@ namespace ofxImGui
 	bool AddParameter(ofParameter<ofColor>& parameter, bool alpha = true);
 	bool AddParameter(ofParameter<ofFloatColor>& parameter, bool alpha = true);
 
-	bool AddParameter(ofParameter<std::string>& parameter, size_t maxChars = 255, bool multiline = false);
+	bool AddParameter(ofParameter<std::string>& parameter, size_t maxChars = 255, bool multiline = false, float width = 0);
 
 	bool AddParameter(ofParameter<void>& parameter, float width = 0);
 
 	template<typename ParameterType>
-	bool AddParameter(ofParameter<ParameterType>& parameter);
+	bool AddParameter(ofParameter<ParameterType>& parameter, float width = 0);
 
 	template<typename ParameterType>
 	bool AddText(ofParameter<ParameterType>& parameter, bool label = true);
 
-	bool AddRadio(ofParameter<int>& parameter, std::vector<std::string> labels, int columns = 1);
-	bool AddCombo(ofParameter<int>& parameter, std::vector<std::string> labels);
-	bool AddStepper(ofParameter<int>& parameter, int step = 1, int stepFast = 100);
+	bool AddRadio(ofParameter<int>& parameter, std::vector<std::string> labels, int columns = 1, float width = 0);
+	bool AddCombo(ofParameter<int>& parameter, std::vector<std::string> labels, float width = 0);
+	bool AddStepper(ofParameter<int>& parameter, int step = 1, int stepFast = 100, float width = 0);
 
 	bool AddSlider(ofParameter<float>& parameter, const char* format = "%.3f", bool logarithmic = false);
 
@@ -157,8 +157,13 @@ static ImTextureID GetImTextureID(GLuint glID)
 
 //--------------------------------------------------------------
 template<typename ParameterType>
-bool ofxImGui::AddParameter(ofParameter<ParameterType>& parameter)
+bool ofxImGui::AddParameter(ofParameter<ParameterType>& parameter, float width)
 {
+	if (width > 0.0f)
+	{
+		const float labelWidth = ImGui::CalcTextSize(parameter.getName().c_str()).x;
+		ImGui::SetNextItemWidth(width - labelWidth);
+	}
 	auto tmpRef = parameter.get();
 	const auto& info = typeid(ParameterType);
 	if (info == typeid(float))

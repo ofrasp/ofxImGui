@@ -192,7 +192,9 @@ Also: information for using ofxImGui within ofxAddons and for ofxImGui developer
 
 #### ofxAddons providing native ofxImGui integration
 
-- [ofxBlend2D](https://github.com/Daandelange/ofxBlend2D)
+- [Daandelange/ofxBlend2D](https://github.com/Daandelange/ofxBlend2D)
+- [roymacdonald/ofxGLWarper](https://github.com/roymacdonald/ofxGLWarper)
+- [daandelange/ofxPlayHead](https://github.com/daandelange/ofxPlayHead)
 - [How to add support for my addon](./Developers.md#ofxImGui-integration-within-ofxAddons) ?
 
 - - - -

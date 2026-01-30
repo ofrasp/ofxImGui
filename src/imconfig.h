@@ -17,6 +17,8 @@
 #include "ofConstants.h"
 #include "ofxImGuiConstants.h"
 
+// Auto-enable math operators, to prevent headaches with ImVecX/ofVecX type conversions.
+//#define IMGUI_DEFINE_MATH_OPERATORS
 
 // USE the OF GL loader (GLEW), otherwise imgui will autodetect the system glew headers
 // Note: Since imgui 1.89.3 there's a new custom loader that we might be able to use too ?

@@ -27,6 +27,7 @@
 #pragma once
 #include "imgui.h"      // IMGUI_IMPL_API
 #ifndef IMGUI_DISABLE
+#if !defined(TARGET_OPENGLES)
 
 // Follow "Getting Started" link and check examples/ folder to learn about using backends!
 IMGUI_IMPL_API bool     ImGui_ImplOpenGL2_Init();
@@ -42,3 +43,4 @@ IMGUI_IMPL_API void     ImGui_ImplOpenGL2_DestroyDeviceObjects();
 IMGUI_IMPL_API void     ImGui_ImplOpenGL2_UpdateTexture(ImTextureData* tex);
 
 #endif // #ifndef IMGUI_DISABLE
+#endif

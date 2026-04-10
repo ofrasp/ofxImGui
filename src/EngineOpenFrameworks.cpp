@@ -10,7 +10,10 @@
 // Renderer includes
 #include "ofGLProgrammableRenderer.h"
 #include "backends/imgui_impl_opengl3.h"
+
+#if !defined(TARGET_OPENGLES)
 #include "backends/imgui_impl_opengl2.h"
+#endif
 
 #include "imgui.h"
 
@@ -62,13 +65,14 @@ namespace ofxImGui
 			// Todo: Maybe better to replace with const getGLVersionFromOF(); ?
 			// To be tested on multiple platforms.
 #if defined( TARGET_OPENGLES )
-			ImGui_ImplOpenGL3_Init( "#version 100" ); // Todo: we might need to pass another or no version string here
+			const char* glsl_version = getGLVersionFromOF();
+			ImGui_ImplOpenGL3_Init( glsl_version);
 #else
 			ImGui_ImplOpenGL3_Init();
 #endif
 		} else {
 #if defined( TARGET_OPENGLES )
-			ImGui_ImplOpenGL2_Init(); // Todo: we might need to pass a version string here
+			//ImGui_ImplOpenGL2_Init(); // Todo: we might need to pass a version string here
 #else
 			ImGui_ImplOpenGL2_Init(); // Todo: we might need to pass a version string here
 #endif
@@ -95,7 +99,9 @@ namespace ofxImGui
 		if (ofIsGLProgrammableRenderer()){
 			ImGui_ImplOpenGL3_Shutdown();
 		} else {
+#if !defined( TARGET_OPENGLES )
 			ImGui_ImplOpenGL2_Shutdown();
+#endif
 		}
 
 		//ImGui::DestroyContext();
@@ -119,7 +125,9 @@ namespace ofxImGui
 		if (ofIsGLProgrammableRenderer()){
 			ImGui_ImplOpenGL3_NewFrame();
 		} else {
+#if !defined( TARGET_OPENGLES )
 			ImGui_ImplOpenGL2_NewFrame();
+#endif
 		}
 	}
 
@@ -139,7 +147,9 @@ namespace ofxImGui
 		if (ofIsGLProgrammableRenderer()){
 			ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 		} else {
+#if !defined( TARGET_OPENGLES )
 			ImGui_ImplOpenGL2_RenderDrawData( ImGui::GetDrawData() );
+#endif
 		}
 
 	}
@@ -154,7 +164,9 @@ namespace ofxImGui
 			return ImGui_ImplOpenGL3_CreateFontsTexture();
 		}
 		else {
+#if defined( TARGET_OPENGLES )
 			return ImGui_ImplOpenGL2_CreateFontsTexture();
+#endif
 		}
 #else
 		return false;

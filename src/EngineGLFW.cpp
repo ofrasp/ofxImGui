@@ -7,8 +7,13 @@
 #include "ofGLProgrammableRenderer.h"
 #include "GLFW/glfw3.h"
 #include "backends/imgui_impl_glfw.h"
+
 #include "backends/imgui_impl_opengl3.h"
+
+// Legacy fixed-function pipeline (OpenGL2) – desktop only
+#if !defined(TARGET_OPENGLES)
 #include "backends/imgui_impl_opengl2.h"
+#endif
 
 #if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 0 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
 	#include "backends/imgui_impl_glfw_context_support.h"
@@ -101,8 +106,10 @@ namespace ofxImGui
 			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with OpenGL2 and ofIsGLProgrammableRenderer()=" << (ofIsGLProgrammableRenderer()?"1":"0");
     #endif
 #endif
+			#if !defined(TARGET_OPENGLES)
             ImGui_ImplOpenGL2_Init();
             ImGui_ImplOpenGL2_CreateDeviceObjects();
+			#endif
         }
 
 		isSetup = true;
@@ -133,9 +140,11 @@ namespace ofxImGui
             ImGui_ImplOpenGL3_Shutdown(); // called by ImGuiDestroyContext() later ?
         }
         else {
+			#if !defined(TARGET_OPENGLES)
             //ImGui_ImplOpenGL2_DestroyFontsTexture(); // called by function below
             //ImGui_ImplOpenGL2_DestroyDeviceObjects(); // Called below
             ImGui_ImplOpenGL2_Shutdown();
+			#endif
         }
 		// Note: Restores OF callbacks; can it happen that of unregistered them already ?
 		ImGui_ImplGlfw_Shutdown();
@@ -153,7 +162,9 @@ namespace ofxImGui
             ImGui_ImplOpenGL3_NewFrame();
         }
         else{
+			#if !defined(TARGET_OPENGLES)
             ImGui_ImplOpenGL2_NewFrame();
+			#endif
         }
         ImGui_ImplGlfw_NewFrame();
     }
@@ -174,6 +185,7 @@ namespace ofxImGui
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
         else {
+			#if !defined(TARGET_OPENGLES)
             // GLint last_program;
             // glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
             // glUseProgram(0);
@@ -181,6 +193,7 @@ namespace ofxImGui
             //e.g. glBindBuffer(GL_ARRAY_BUFFER, 0), glDisable(GL_TEXTURE_CUBE_MAP).
             ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
             //glUseProgram(last_program);
+			#endif
         }
         updatePlatformWindows();
     }

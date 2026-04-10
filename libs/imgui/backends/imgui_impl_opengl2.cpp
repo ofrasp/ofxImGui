@@ -56,8 +56,9 @@
 
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
-#include "imgui_impl_opengl2.h"
-#include <stdint.h>     // intptr_t
+#if !defined(TARGET_OPENGLES)
+
+
 
 // Clang/GCC warnings with -Weverything
 #if defined(__clang__)
@@ -68,6 +69,11 @@
 
 // --- BEGIN CUSTOM MODIFICATION
 #include "ofxImGuiConstants.h"
+#if !defined(TARGET_OPENGLES)
+#include "imgui_impl_opengl2.h"
+#endif
+#include <stdint.h>     // intptr_t
+
 #if defined(OFXIMGUI_RENDERER_GLES)
 #include "gles1CompatibilityHacks.h"
 #else// --- END CUSTOM MODIFICATION
@@ -401,3 +407,4 @@ static void ImGui_ImplOpenGL2_ShutdownMultiViewportSupport()
 #endif
 
 #endif // #ifndef IMGUI_DISABLE
+#endif

@@ -14,6 +14,22 @@
 // Grab ofConstants
 #include "ofConstants.h"
 
+// Let projects define their own settings by providing an `ofximguiconfig.h`, like `imconfig.h`
+// Only works on C++17 and above
+#if (__cplusplus >= 201703L)
+#define ofxImGui_HAS_INCLUDE(x) __has_include(x)
+#else
+#define ofxImGui_HAS_INCLUDE(x) false
+#endif
+#if (__cplusplus >= 201703L) && __has_include("ofximguiconfig.h")
+#   ifdef DEBUG
+#   	pragma message "ofxImGui : Loading custom config file `ofximguiconfig.h` !"
+#   endif
+#	include "ofximguiconfig.h"
+#endif
+
+
+
 // OFXIMGUI_DEBUG
 #ifndef OFXIMGUI_DEBUG
 	// Uncomment to enable debugging by default

@@ -200,6 +200,8 @@ namespace ofxImGui
 		// Handle gui state saving
 		if(_restoreGuiState == false)
 			io.IniFilename = nullptr;
+		else
+			io.IniFilename = iniFileName.c_str();
 
 		// Start engines
 		this->context->engine.setup( _ofWindow.get(), context->imguiContext, context->autoDraw);

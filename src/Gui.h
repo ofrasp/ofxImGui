@@ -193,6 +193,8 @@ namespace ofxImGui
 		bool wantsCaptureMouse() const;
 		bool wantsCaptureKeyboard() const;
 
+		std::string iniFileName = ofToDataPath("imgui.ini");
+
     private:
         void render();
         static void initialiseForWindow();

@@ -10,7 +10,6 @@
 
 #include "backends/imgui_impl_opengl3.h"
 
-// Legacy fixed-function pipeline (OpenGL2) – desktop only
 #if !defined(TARGET_OPENGLES)
 #include "backends/imgui_impl_opengl2.h"
 #endif
@@ -44,11 +43,10 @@ namespace ofxImGui
                 #pragma message "You are using the new Rpi GLFW binding. Please ensure that your raspi-config doesn't use the Legacy video drivers for better performance."
             #endif
 
-            // Warn for GL ES 1 usage (unsupported by imgui)
             if( !ofIsGLProgrammableRenderer() ){
                 ofLogWarning(__FUNCTION__) << "ofxImGui has not been tested with GL ES 1.0 and there's no official imgui backend for it.";
             }
-        #endif // rpi gles
+        #endif
 #endif // debug
 
 		// Store a reference to the current imgui context for event handling

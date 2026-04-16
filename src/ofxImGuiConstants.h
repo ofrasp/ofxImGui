@@ -47,16 +47,12 @@
 #endif
 
 #if defined(__EMSCRIPTEN__) || defined(TARGET_EMSCRIPTEN) || defined(TARGET_OPENGLES)
-	// Emscripten always wants the modern programmable pipeline
     #define OFXIMGUI_BACKEND_GLFW
 	#define OFXIMGUI_RENDERER_GLES_2
 	#define IMGUI_IMPL_OPENGL_ES3
     #define OFXIMGUI_RENDERER_GLES_3
-
-	// Do NOT enter the GLES1 block above
-#elif defined(TARGET_RASPBERRY_PI) || defined(TARGET_OF_IOS) // ... your existing GLES1 case
+#elif defined(TARGET_RASPBERRY_PI) || defined(TARGET_OF_IOS)
 	#define OFXIMGUI_RENDERER_GLES
-	// ... your existing GLES1 hack block stays here
 #endif
 
 // Platform backend selection

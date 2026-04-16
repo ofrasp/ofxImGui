@@ -40,7 +40,8 @@ One tiny disadvantage of the Glfw backend is that multiwindow-together-with-view
 | Linux   | Yes           | Yes           | Yes           | Yes            | Yes           | Should        |
 | Rpi3    | Should        | Unknown       | Unknown       | Yes            | Yes           | Yes           |
 | Rpi4    | Unknown       | Should        | Should        | Should         | Should        | Should        |
-| iOS     | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Should        | Should        |
+| iOS     | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Yes           | Yes           |
+| WebGL   | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Yes           | Yes           |
 
 *Note: This support table does not take into account software emulated support for graphics APIs.*  
 *Note: GL ES 1 (the fixed pipeline ES shading language) is not natively supported by the native DearImGui backend, but it works with [some dirty hacks](src/gles1CompatibilityHacks.h).*

@@ -189,6 +189,7 @@ Also: information for using ofxImGui within ofxAddons and for ofxImGui developer
 - [Artificiel/ofxImGuiTextEditor](https://gitlab.artificiel.org/ofxaddons/ofxImGuiTextEditor): A syntax highlighting text editor based on [BalazsJako/ImGuiColorTextEdit](https://github.com/BalazsJako/ImGuiColorTextEdit).
 - [Daandelange/ofxSimpleApp](https://github.com/Daandelange/ofxSimpleApp): A general purpose application layout for kick-starting your projects.
 - [sebleedelisle/ofxLaser:ofxLaserUI](https://github.com/sebleedelisle/ofxLaser/blob/main/src/interface/ofxLaserUI.cpp) : Alternative interface for interfacing with ofApp & alternative helpers / gui-builder for ofParameters.
+- [ofxyz/ofxImPlot](https://github.com/ofxyz/ofxImPlot) : ImPlot library for ofxImGui.
 
 #### ofxAddons providing native ofxImGui integration
 

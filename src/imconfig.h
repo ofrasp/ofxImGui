@@ -286,3 +286,16 @@ namespace ImGui
 
 // Note: maybe other variables need to be stitched too ?
 //#define IMGUI_BACKEND_GLFW_CUSTOM_NEWFRAME() { bd->Window = (GLFWwindow*)io.BackendPlatformUserData; }
+
+//---- Dear ImGui Test Engine (optional; addon: addons/ofxImGuiTestSuite + ocornut/imgui_test_engine)
+// Define OFX_IMGUI_ENABLE_TEST_ENGINE in the *project* for all TUs that compile Dear ImGui (config.make /
+// MSVC preprocessor definitions). Vendor sources under addons/ofxImGuiTestSuite/libs/imgui_test_engine .
+#if defined(OFX_IMGUI_ENABLE_TEST_ENGINE)
+#ifndef IMGUI_TEST_ENGINE_ENABLE_COROUTINE_STDTHREAD_IMPL
+#define IMGUI_TEST_ENGINE_ENABLE_COROUTINE_STDTHREAD_IMPL 1
+#endif
+#ifndef IMGUI_TEST_ENGINE_ENABLE_CAPTURE
+#define IMGUI_TEST_ENGINE_ENABLE_CAPTURE 0
+#endif
+#include "../../ofxImGuiTestSuite/libs/imgui_test_engine/imgui_te_imconfig.h"
+#endif

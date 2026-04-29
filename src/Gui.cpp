@@ -170,8 +170,16 @@ namespace ofxImGui
 		io.MouseDrawCursor = _showImGuiMouseCursor;
 
 		// Handle gui state saving
-		if(_restoreGuiState == false)
+		if(_restoreGuiState == false) {
 			io.IniFilename = nullptr;
+		} else {
+			// Route the ini file through ofToDataPath so it always lands in the
+			// writable data folder.  On Pi (and other embedded targets) the CWD
+			// is often read-only, so ImGui's default relative "imgui.ini" path
+			// would silently fail to save / load the layout.
+			static std::string sIniPath = ofToDataPath("imgui.ini", true);
+			io.IniFilename = sIniPath.c_str();
+		}
 
 		this->context->engine.setup( _ofWindow.get(), context->imguiContext, context->autoDraw);
 

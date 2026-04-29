@@ -1,6 +1,5 @@
 #include "DefaultTheme.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "ofColor.h"
 #include "imgui.h"
 

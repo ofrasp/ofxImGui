@@ -14,6 +14,13 @@
 
 #pragma once
 
+// Must be defined before imgui.h processes ImVec2 so courtesy operators (+=, *= float, etc.) are emitted on the first include.
+// Headers that include "imgui.h" directly (not via ofxImGui.h) leave IMGUI_DEFINE_MATH_OPERATORS set
+// without IMGUI_DEFINE_MATH_OPERATORS_IMPLEMENTED, which breaks imgui_internal.h and code like ImLightRig (ImVec2 *= float).
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
+
 #include "ofxImGuiConstants.h"
 
 

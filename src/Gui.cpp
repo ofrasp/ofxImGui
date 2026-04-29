@@ -253,7 +253,7 @@ namespace ofxImGui
 		}
 #endif
 
-		return SetupState::Master;
+		return SetupState::SetupMaster;
 	}
 
 	//--------------------------------------------------------------

@@ -87,7 +87,7 @@ While interfacing your ofApp with ofxImGui, a good practise is to enable `OFXIMG
   The setup function returns an `ofxImGui::SetupState` indicating if the setup failed succeeded as a slave or master.  
    - `if( gui->setup(...) & ofxImGui::SetupState::Success ) // I'm either a slave or a master`   
    - `if( gui->setup(...) & ofxImGui::SetupState::Slave   ) // Setup as slave : some requested parameters might have been ignored and there's other code using ofxImGui.`
-   - `if( gui->setup(...) & ofxImGui::SetupState::Master  ) // Setup as master : You were the first to create a GUI instance in this ofApp.`   
+   - `if( gui->setup(...) & ofxImGui::SetupState::SetupMaster  ) // Setup as master : You were the first to create a GUI instance in this ofApp.`   
    - `if(  gui->setup(...) ) // Same as success`  
    - `if( !gui->setup(...) ) // There was an error`
 

@@ -1,18 +1,45 @@
 #include "ofApp.h"
+#include <cmath>
+#include <vector>
+#include <string>
+
+// Uncomment to switch between 2 modes
+//#define GLOBAL_ARB_TEX
 
 //--------------------------------------------------------------
 void ofApp::setup()
 {
 	ofSetLogLevel(OF_LOG_NOTICE);
-	ofDisableArbTex();
 	ofSetBackgroundAuto(false);
 	ofSetVerticalSync(true);
 	ofSetFrameRate(60);
 
 	this->stepper = 0.0f;
 
-	// Gui
-	this->gui.setup();
+    // FBO
+#ifdef GLOBAL_ARB_TEX
+    // Option 1 : Set all textures to GL_TEXTURE_2D in setup (recommended)
+    ofDisableArbTex();
+    fbo.allocate(200,200,GL_RGBA);
+#else
+    // Option 2 : Specify the texture target explicitly (when you can't set yourall ofApp textures to GL_TEXTURE_2D
+    ofFbo::Settings fboSettings ;
+    fboSettings.width = 200;
+    fboSettings.height = 200;
+    fboSettings.internalformat = GL_RGBA ;
+    fboSettings.textureTarget = GL_TEXTURE_2D;
+    fbo.allocate(fboSettings);
+#endif
+    fbo.checkStatus();
+    fbo.begin();
+    ofClear(0,0);
+    ofSetColor(10,200,10);
+    ofFill();
+    ofDrawCircle(100,100, 90);
+    fbo.end();
+
+    // Gui
+    gui.setup(nullptr, true, ImGuiConfigFlags_None, true);
 	this->guiVisible = true;
 }
 
@@ -165,9 +192,9 @@ bool ofApp::loadImage(const string & filePath)
 	texData.width = image.getWidth();
 	texData.height = image.getHeight();
 	texData.textureTarget = GL_TEXTURE_2D;
-	texData.bFlipTexture = true;
 	this->texture.allocate(texData);
 	this->texture.loadData(image.getPixels());
+    //texData.bFlipTexture = true;
 
 	this->imagePath = ofFilePath::makeRelative(ofToDataPath(""), filePath);
 	return true;
@@ -180,7 +207,8 @@ bool ofApp::imGui()
 
 	this->gui.begin();
 	{
-		if (ofxImGui::BeginWindow("Helpers", mainSettings, false))
+        static bool bCollapse = false;
+        if (ofxImGui::BeginWindow("Helpers", mainSettings, ImGuiWindowFlags_NoCollapse, &bCollapse))
 		{
 			ImGui::Text("%.1f FPS (%.3f ms/frame)", ofGetFrameRate(), 1000.0f / ImGui::GetIO().Framerate);
 
@@ -225,8 +253,29 @@ bool ofApp::imGui()
 
 				ofxImGui::EndTree(mainSettings);
 			}
+
+			// Some work has yet to be done on the Helpers.
+			// For example, the line below causes a crash
+			// ofxImGui::AddGroup(this->render, mainSettings);
 		}
-		ofxImGui::EndWindow(mainSettings);
+        ofxImGui::EndWindow(mainSettings);
+        //ImGui::End();
+
+		// 2nd window
+		auto altSettings = ofxImGui::Settings();
+		if (ofxImGui::BeginWindow("2nd Helpers", altSettings, ImGuiWindowFlags_NoCollapse, &bCollapse))
+		{
+			ImGui::TextWrapped("%s", "The helper settings return information about the window state : the white box around this window shows how to use them.\n"\
+									 "Also, when you reopen this application, window positions and sizes should restore to their last state before exiting." );
+		}
+		ofxImGui::EndWindow(altSettings);
+
+		// Draw a rectangle to check if the returned values are correct
+		#define MY_MARGING 10
+		ofPushStyle();
+		ofNoFill();
+		ofDrawRectRounded(altSettings.windowPos-ofVec2f(MY_MARGING,MY_MARGING), altSettings.windowSize.x+2*MY_MARGING, altSettings.windowSize.y+2*MY_MARGING, MY_MARGING);
+		ofPopStyle();
 
 		if (this->preview)
 		{
@@ -241,6 +290,11 @@ bool ofApp::imGui()
 			}
 			ofxImGui::EndWindow(previewSettings);
 		}
+		if(ImGui::Begin("ofFboTexture")){
+            glm::vec2 size = {fbo.getWidth(), fbo.getHeight()};
+            ofxImGui::AddImage(fbo, size);
+		}
+		ImGui::End();
 	}
 	this->gui.end();
 

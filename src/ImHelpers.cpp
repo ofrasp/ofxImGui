@@ -5,14 +5,22 @@ ofxImGui::Settings::Settings()
 	: windowPos(kImGuiMargin, kImGuiMargin)
 	, windowSize(ofVec2f::zero())
 	, lockPosition(false)
-	, windowBlock(false)
 	, mouseOverGui(false)
-    , treeLevel(0)
+	, windowBlock(false)
+	, treeLevel(0)
 {}
 
 bool ofxImGui::IsMouseOverGui()
 {
-	return ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+	return ImGui::GetIO().WantCaptureMouse;
+	// Old way
+	// Note: Window hoved turns off when widgets are active, so we check that too
+	//return ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) || ImGui::IsAnyItemActive();
+}
+
+bool ofxImGui::IsAnyGuiActive()
+{
+	return ImGui::IsAnyItemActive();
 }
 
 //--------------------------------------------------------------
@@ -25,9 +33,16 @@ const char * ofxImGui::GetUniqueName(ofAbstractParameter& parameter)
 const char * ofxImGui::GetUniqueName(const std::string& candidate)
 {
 	std::string result = candidate;
-	while (std::find(windowOpen.usedNames.top().begin(), windowOpen.usedNames.top().end(), result) != windowOpen.usedNames.top().end())
-	{
-		result += " ";
+	if( !windowOpen.usedNames.empty() ) {
+		while (std::find(windowOpen.usedNames.top().begin(), windowOpen.usedNames.top().end(), result) != windowOpen.usedNames.top().end())
+		{
+			// Note: Add a space to (invisibly) differenciate the parameter name from another one with the same name
+			result += " ";
+		}
+	}
+	else {
+		// Create top-level stack in window-less zones. See issue #6.
+		windowOpen.usedNames.push(std::vector<std::string>());
 	}
 	windowOpen.usedNames.top().push_back(result);
 	return windowOpen.usedNames.top().back().c_str();
@@ -59,7 +74,7 @@ bool ofxImGui::BeginWindow(ofParameter<bool>& parameter, Settings& settings, boo
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, bool collapse, bool * open)
+bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, bool collapsible, bool * open)
 {
 	if (settings.windowBlock)
 	{
@@ -72,10 +87,10 @@ bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, bool col
 	// Push a new list of names onto the stack.
 	windowOpen.usedNames.push(std::vector<std::string>());
 
-	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition? ImGuiCond_Always : ImGuiCond_Appearing);
-	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_Appearing);
+	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_FirstUseEver);
 	//ImGui::SetNextWindowCollapsed(collapse, ImGuiCond_Appearing);
-	return ImGui::Begin(name.c_str(), open, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | (collapse ? 0 : ImGuiWindowFlags_NoCollapse));
+	return ImGui::Begin(name.c_str(), open, /*ImGuiWindowFlags_NoSavedSettings |*/ /*ImGuiWindowFlags_AlwaysAutoResize |*/ (collapsible ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoCollapse));
 }
 
 //--------------------------------------------------------------
@@ -92,9 +107,9 @@ bool ofxImGui::BeginWindow(const std::string& name, Settings& settings, ImGuiWin
 	// Push a new list of names onto the stack.
 	windowOpen.usedNames.push(std::vector<std::string>());
 
-	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition? ImGuiCond_Always : ImGuiCond_Appearing);
-	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_Appearing);
-	ImGui::SetNextWindowCollapsed(!(flags & ImGuiWindowFlags_NoCollapse), ImGuiCond_Appearing);
+	ImGui::SetNextWindowPos(settings.windowPos, settings.lockPosition? ImGuiCond_Always : ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(settings.windowSize, ImGuiCond_FirstUseEver);
+	if(!(flags & ImGuiWindowFlags_NoCollapse)) ImGui::SetNextWindowCollapsed(true, ImGuiCond_Appearing); // Initially collapse collapsible windows
 	return ImGui::Begin(name.c_str(), open, flags);
 }
 
@@ -142,7 +157,7 @@ bool ofxImGui::BeginTree(ofAbstractParameter& parameter, Settings& settings)
 bool ofxImGui::BeginTree(const std::string& name, Settings& settings)
 {
 	bool result;
-    ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
+	ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
 	if (settings.treeLevel == 0)
 	{
 		result = ImGui::TreeNodeEx(GetUniqueName(name), ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoAutoOpenOnLog);
@@ -173,7 +188,7 @@ void ofxImGui::EndTree(Settings& settings)
 }
 
 //--------------------------------------------------------------
-void ofxImGui::AddGroup(ofParameterGroup& group, Settings& settings)
+void ofxImGui::AddGroup(ofParameterGroup& group, Settings& settings )
 {
 	bool prevWindowBlock = settings.windowBlock;
 	if (settings.windowBlock)
@@ -248,6 +263,12 @@ void ofxImGui::AddGroup(ofParameterGroup& group, Settings& settings)
 			ofxImGui::AddParameter(*parameterFloatColor);
 			continue;
 		}
+		auto parameterColor = std::dynamic_pointer_cast<ofParameter<ofColor>>(parameter);
+		if (parameterColor)
+		{
+			ofxImGui::AddParameter(*parameterColor);
+			continue;
+		}
 		auto parameterFloat = std::dynamic_pointer_cast<ofParameter<float>>(parameter);
 		if (parameterFloat)
 		{
@@ -264,6 +285,12 @@ void ofxImGui::AddGroup(ofParameterGroup& group, Settings& settings)
 		if (parameterBool)
 		{
 			ofxImGui::AddParameter(*parameterBool);
+			continue;
+		}
+		auto parameterString = std::dynamic_pointer_cast<ofParameter<std::string>>(parameter);
+		if (parameterString)
+		{
+			ofxImGui::AddParameter(*parameterString);
 			continue;
 		}
 
@@ -395,9 +422,111 @@ bool ofxImGui::AddParameter(ofParameter<ofVec4f>& parameter)
 }
 
 //--------------------------------------------------------------
+bool ofxImGui::ColorEdit3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorEdit3(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorEdit4(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit3(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorEdit3(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit4(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorEdit4(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorPicker3(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags, const float* ref_col)
+{
+	return ImGui::ColorPicker4(label, &color.r, flags, ref_col);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker3(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorPicker3(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker4(const char* label, ofColor& color, ImGuiColorEditFlags flags, const float* ref_col)
+{
+	ofFloatColor tmp(color);
+	if (ColorPicker4(label, tmp, flags, ref_col))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
 bool ofxImGui::AddParameter(ofParameter<ofFloatColor>& parameter, bool alpha)
 {
 	auto tmpRef = parameter.get();
+	if (alpha)
+	{
+		if (ImGui::ColorEdit4(GetUniqueName(parameter), &tmpRef.r))
+		{
+			parameter.set(tmpRef);
+			return true;
+		}
+	}
+	else if (ImGui::ColorEdit3(GetUniqueName(parameter), &tmpRef.r))
+	{
+		parameter.set(tmpRef);
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::AddParameter(ofParameter<ofColor>& parameter, bool alpha)
+{
+	//auto tmpRef = parameter.get();
+
+	ofParameter<ofFloatColor> c;
+	c.set(parameter.getName(),
+		ofFloatColor(parameter.get().r / 255.f, parameter.get().g / 255.f, parameter.get().b / 255.f, parameter.get().a / 255.f),
+		ofFloatColor(0, 0, 0, 0),
+		ofFloatColor(1.f, 1.f, 1.f, 1.f)
+	);
+
+	auto tmpRef = c.get();
+
 	if (alpha)
 	{
 		if (ImGui::ColorEdit4(GetUniqueName(parameter), &tmpRef.r))
@@ -453,7 +582,7 @@ bool ofxImGui::AddParameter(ofParameter<void>& parameter, float width)
 bool ofxImGui::AddRadio(ofParameter<int>& parameter, std::vector<std::string> labels, int columns)
 {
 	auto uniqueName = GetUniqueName(parameter);
-    ImGui::Text("%s", uniqueName);
+	ImGui::Text("%s", uniqueName);
 	auto result = false;
 	auto tmpRef = parameter.get();
 	ImGui::PushID(uniqueName);
@@ -483,10 +612,10 @@ bool ofxImGui::AddCombo(ofParameter<int>& parameter, std::vector<std::string> la
 	{
 		for (size_t i = 0; i < labels.size(); ++i)
 		{
-			bool selected = (i == tmpRef);
+			bool selected = (static_cast<int>(i) == tmpRef);
 			if (ImGui::Selectable(labels[i].c_str(), selected))
 			{
-				tmpRef = i;
+				tmpRef = static_cast<int>(i);
 				result = true;
 			}
 			if (selected)
@@ -517,10 +646,10 @@ bool ofxImGui::AddStepper(ofParameter<int>& parameter, int step, int stepFast)
 }
 
 //--------------------------------------------------------------
-bool ofxImGui::AddSlider(ofParameter<float>& parameter, const char* format, float power)
+bool ofxImGui::AddSlider(ofParameter<float>& parameter, const char* format, bool logarithmic)
 {
 	auto tmpRef = parameter.get();
-	if (ImGui::SliderFloat(GetUniqueName(parameter), (float*)&tmpRef, parameter.getMin(), parameter.getMax(), format, power))
+	if (ImGui::SliderFloat(GetUniqueName(parameter), (float*)&tmpRef, parameter.getMin(), parameter.getMax(), format, logarithmic? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None))
 	{
 		parameter.set(tmpRef);
 		return true;
@@ -825,8 +954,13 @@ void ofxImGui::AddImage(const ofBaseHasTexture& hasTexture, const ofVec2f& size)
 //--------------------------------------------------------------
 void ofxImGui::AddImage(const ofTexture& texture, const ofVec2f& size)
 {
-	ImTextureID textureID = GetImTextureID(texture);
-	ImGui::Image(textureID, size);
+    if (texture.getTextureData().textureTarget == GL_TEXTURE_2D){
+        ImTextureID textureID = GetImTextureID(texture);
+        ImGui::Image(textureID, size);
+    }
+    else {
+        ImGui::TextDisabled("Error: can't display GL_TEXTURE_RECTANGLE textures.\nPlease use GL_TEXTURE_2D.");
+    }
 }
 
 #if OF_VERSION_MINOR >= 10
@@ -834,37 +968,41 @@ void ofxImGui::AddImage(const ofTexture& texture, const ofVec2f& size)
 //--------------------------------------------------------------
 void ofxImGui::AddImage(const ofBaseHasTexture& hasTexture, const glm::vec2& size)
 {
-    ofxImGui::AddImage(hasTexture.getTexture(), size);
+	ofxImGui::AddImage(hasTexture.getTexture(), size);
 }
 
 //--------------------------------------------------------------
 void ofxImGui::AddImage(const ofTexture& texture, const glm::vec2& size)
 {
-    ImTextureID textureID = GetImTextureID(texture);
-    ImGui::Image(textureID, size);
+    if (texture.getTextureData().textureTarget == GL_TEXTURE_2D){
+        ImTextureID textureID = GetImTextureID(texture);
+        ImGui::Image(textureID, size);
+    }
+    else {
+        ImGui::TextDisabled("Error: can't display GL_TEXTURE_RECTANGLE textures.\nPlease use GL_TEXTURE_2D.");
+    }
 }
 
 #endif
 
-static auto vector_getter = [](void* vec, int idx, const char** out_text)
+static auto vector_getter = [](void* vec, int idx)
 {
-    auto& vector = *static_cast<std::vector<std::string>*>(vec);
-    if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-    *out_text = vector.at(idx).c_str();
-    return true;
+	auto& vector = *static_cast<std::vector<std::string>*>(vec);
+	if (idx < 0 || idx >= static_cast<int>(vector.size())) { return ""; }
+	return (const char*) vector.at(idx).c_str();
 };
 
 bool ofxImGui::VectorCombo(const char* label, int* currIndex, std::vector<std::string>& values)
 {
-    if (values.empty()) { return false; }
-    return ImGui::Combo(label, currIndex, vector_getter,
-                        static_cast<void*>(&values), values.size());
+	if (values.empty()) { return false; }
+	return ImGui::Combo(label, currIndex, vector_getter,
+						static_cast<void*>(&values), values.size());
 }
 
 bool ofxImGui::VectorListBox(const char* label, int* currIndex, std::vector<std::string>& values)
 {
-    if (values.empty()) { return false; }
-    return ImGui::ListBox(label, currIndex, vector_getter,
-                   static_cast<void*>(&values), values.size());
+	if (values.empty()) { return false; }
+	return ImGui::ListBox(label, currIndex, vector_getter,
+				   static_cast<void*>(&values), values.size());
 }
 

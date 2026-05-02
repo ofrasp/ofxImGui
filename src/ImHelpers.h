@@ -1,17 +1,19 @@
 #pragma once
 
 #include "ofGLBaseTypes.h"
+#include "ofColor.h"
 #include "ofParameter.h"
 #include "ofRectangle.h"
 #include "ofTexture.h"
 #include "ofGLBaseTypes.h"
 #include "imgui.h"
-#include <stack>
+#include <stack> // Needed for Arch Linux
+
+#include "gles1CompatibilityHacks.h" // needed on rpi3 for GL_TEXTURE_RECTANGLE
 
 static const int kImGuiMargin = 10;
 
-
-
+// Todo: ScopedHelpers like in ImGuiMagnumIntegration and Cinder's ImGui
 
 namespace ofxImGui
 {
@@ -46,13 +48,14 @@ namespace ofxImGui
 	static WindowOpen windowOpen;
 
 	bool IsMouseOverGui();
+	bool IsAnyGuiActive();
 
 	const char * GetUniqueName(ofAbstractParameter& parameter);
 	const char * GetUniqueName(const std::string& candidate);
 
 	void SetNextWindow(Settings& settings);
 	bool BeginWindow(ofParameter<bool>& parameter, Settings& settings, bool collapse = true);
-	bool BeginWindow(const std::string& name, Settings& settings, bool collapse = true, bool * open = nullptr);
+	bool BeginWindow(const std::string& name, Settings& settings, bool collapsible = true, bool * open = nullptr);
 	bool BeginWindow(const std::string& name, Settings& settings, ImGuiWindowFlags flags, bool * open = nullptr);
 	void EndWindow(Settings& settings);
 
@@ -75,8 +78,17 @@ namespace ofxImGui
 	bool AddParameter(ofParameter<ofVec2f>& parameter);
 	bool AddParameter(ofParameter<ofVec3f>& parameter);
 	bool AddParameter(ofParameter<ofVec4f>& parameter);
-
+	bool AddParameter(ofParameter<ofColor>& parameter, bool alpha = true);
 	bool AddParameter(ofParameter<ofFloatColor>& parameter, bool alpha = true);
+
+	bool ColorEdit3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit3(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit4(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0, const float* ref_col = nullptr);
+	bool ColorPicker3(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker4(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0, const float* ref_col = nullptr);
 
 	bool AddParameter(ofParameter<std::string>& parameter, size_t maxChars = 255, bool multiline = false);
 
@@ -92,7 +104,7 @@ namespace ofxImGui
 	bool AddCombo(ofParameter<int>& parameter, std::vector<std::string> labels);
 	bool AddStepper(ofParameter<int>& parameter, int step = 1, int stepFast = 100);
 
-	bool AddSlider(ofParameter<float>& parameter, const char* format = "%.3f", float power = 1.0f);
+	bool AddSlider(ofParameter<float>& parameter, const char* format = "%.3f", bool logarithmic = false);
 
 	bool AddRange(const std::string& name, ofParameter<int>& parameterMin, ofParameter<int>& parameterMax, int speed = 1);
 	bool AddRange(const std::string& name, ofParameter<float>& parameterMin, ofParameter<float>& parameterMax, float speed = 0.01f);
@@ -127,20 +139,28 @@ namespace ofxImGui
 #endif
 }
 
-static ImTextureID GetImTextureID(const ofTexture& texture)
+inline ImTextureID GetImTextureID(const ofTexture& texture)
 {
+#ifdef TARGET_OPENGLES
+	if (false) // GLES only has 2d textures ? (to be verified)
+#else
+	if (texture.getTextureData().textureTarget != GL_TEXTURE_2D)
+#endif
+	{
+		
+        ofLogWarning("Warning, ImGui only supports drawing textures of type GL_TEXTURE_2D.");
+	}
     return (ImTextureID)(uintptr_t)texture.texData.textureID;
 }
 
-static ImTextureID GetImTextureID(const ofBaseHasTexture& hasTexture)
+inline ImTextureID GetImTextureID(const ofBaseHasTexture& hasTexture)
 {
     
     return GetImTextureID(hasTexture.getTexture());
 }
 
-static ImTextureID GetImTextureID(GLuint glID)
+inline ImTextureID GetImTextureID(GLuint glID)
 {
-    
     return (ImTextureID)(uintptr_t)glID;
 
 }
@@ -171,6 +191,7 @@ bool ofxImGui::AddParameter(ofParameter<ParameterType>& parameter)
 	}
 	if (info == typeid(bool))
 	{
+		// fixme : this is so wrong ! See #139
 		if (ImGui::Checkbox(GetUniqueName(parameter), (bool *)&tmpRef))
 		{
 			parameter.set(tmpRef);

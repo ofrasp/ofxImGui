@@ -1,19 +1,37 @@
 #include "ofMain.h"
 #include "ofApp.h"
+#include "ofAppGLFWWindow.h"
 
-int main()
-{
+//========================================================================
+int main() {
+    ofSetLogLevel(OF_LOG_VERBOSE);
 
-#if defined(TARGET_OPENGLES)
-  ofGLESWindowSettings settings;
-  settings.setSize(1280, 720);
-  settings.setGLESVersion(2);
-  ofCreateWindow(settings);
+    int windowWidth = 800;
+    int windowHeight = 600;
+
+#if defined( TARGET_OPENGLES ) || defined ( FORCE_GLES )
+    ofGLESWindowSettings settings;
+#if defined(TARGET_RASPBERRY_PI)
+    settings.setGLESVersion(2);
 #else
-  ofSetupOpenGL(1280, 720, OF_WINDOW);
+    settings.setGLESVersion(3);
 #endif
 
-ofRunApp( new ofApp());
+#else
+    ofGLWindowSettings settings;
+#if defined(TARGET_OSX)
+    settings.setGLVersion(3, 2);
+#else
+    settings.setGLVersion(3, 2);
+    //    settings.setGLVersion(4,1); // Uncomment if your GPU supports it
+#endif
+#endif
+    settings.title = "ofxImGui example-helpers";
+    settings.setSize(windowWidth, windowHeight);
 
+    auto window1 = ofCreateWindow(settings);
+    auto app1 = std::make_shared<ofApp>();
+
+    ofRunApp(window1, app1);
+    ofRunMainLoop();
 }
-

@@ -117,11 +117,14 @@ struct ofxImGuiContext {
 
 namespace ofxImGui
 {
+    // Bitmask values. Keep these as literals instead of shift/enum expressions:
+    // some older Raspberry Pi toolchains have been fragile with enum initializers
+    // such as `1 << n` and values derived from other enum entries.
     enum SetupState : unsigned char {
-        SetupError = 0, // Keep to 0 so that it evaluates to false ?
-        SetupSlave = 2,
-        SetupMaster = 4,
-        SetupSuccess = 6, // Use like: if(mState & Success)
+        Error = 0, // Keep to 0 so that it evaluates to false
+        Slave = 2, // 1 << 1
+        Master = 4, // 1 << 2
+        Success = 6, // Slave | Master
     };
 
 	std::ostream& operator<<(std::ostream& os, const SetupState& _state);

@@ -422,6 +422,78 @@ bool ofxImGui::AddParameter(ofParameter<ofVec4f>& parameter)
 }
 
 //--------------------------------------------------------------
+bool ofxImGui::ColorEdit3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorEdit3(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorEdit4(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit3(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorEdit3(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorEdit4(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorEdit4(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags)
+{
+	return ImGui::ColorPicker3(label, &color.r, flags);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags, const float* ref_col)
+{
+	return ImGui::ColorPicker4(label, &color.r, flags, ref_col);
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker3(const char* label, ofColor& color, ImGuiColorEditFlags flags)
+{
+	ofFloatColor tmp(color);
+	if (ColorPicker3(label, tmp, flags))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+bool ofxImGui::ColorPicker4(const char* label, ofColor& color, ImGuiColorEditFlags flags, const float* ref_col)
+{
+	ofFloatColor tmp(color);
+	if (ColorPicker4(label, tmp, flags, ref_col))
+	{
+		color = tmp;
+		return true;
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
 bool ofxImGui::AddParameter(ofParameter<ofFloatColor>& parameter, bool alpha)
 {
 	auto tmpRef = parameter.get();
@@ -540,10 +612,10 @@ bool ofxImGui::AddCombo(ofParameter<int>& parameter, std::vector<std::string> la
 	{
 		for (size_t i = 0; i < labels.size(); ++i)
 		{
-			bool selected = (i == tmpRef);
+			bool selected = (static_cast<int>(i) == tmpRef);
 			if (ImGui::Selectable(labels[i].c_str(), selected))
 			{
-				tmpRef = i;
+				tmpRef = static_cast<int>(i);
 				result = true;
 			}
 			if (selected)

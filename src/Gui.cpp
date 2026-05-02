@@ -107,13 +107,13 @@ namespace ofxImGui
 #ifdef OFXIMGUI_DEBUG
             ofLogWarning("Gui::setup()") << "This Gui instance is already setup, you are calling it twice ! (ignoring this 2nd call)";
 #endif
-			return isContextOwned ? SetupState::SetupMaster : SetupState::SetupSlave;
+			return isContextOwned ? SetupState::Master : SetupState::Slave;
         }
 
         // Curwindow cannot be null
 		if(_ofWindow==nullptr){
 			ofLogError("Gui::setup()") << "The provided ofAppBaseWindow pointer is null, cannot continue setup !";
-			return SetupState::SetupError;
+			return SetupState::Error;
         }
 
         // Initial docking viewport
@@ -151,7 +151,7 @@ namespace ofxImGui
 			auto createdContext = imguiContexts.emplace(std::piecewise_construct, std::forward_as_tuple(_ofWindow.get()), std::forward_as_tuple(_ofWindow));
 			if(!createdContext.second){ // Failed creating ?
 				ofLogError("Gui::setup()") << "Couldn't create a context for this window !";
-				return SetupState::SetupError;
+				return SetupState::Error;
 			}
 			context = &createdContext.first->second;
 			context->slaveCount ++; // Master counts as a slave too ;)
@@ -190,7 +190,7 @@ namespace ofxImGui
 #ifdef OFXIMGUI_DEBUG
             ofLogVerbose("Gui::setup()") << "Context is not owned, skipping some settings and not binding the engine again.";
 #endif
-			return SetupState::SetupSlave;
+			return SetupState::Slave;
         }
 
 		// Master may set more settings
@@ -253,7 +253,7 @@ namespace ofxImGui
 		}
 #endif
 
-		return SetupState::SetupMaster;
+		return SetupState::Master;
 	}
 
 	//--------------------------------------------------------------

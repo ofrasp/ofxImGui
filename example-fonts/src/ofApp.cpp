@@ -7,8 +7,17 @@
 #include "IconsFontAwesome5.h"
 #include "ProggyTiny.cpp"
 
-// Fixme for c++20 : `u8"stringLiteral"` will not compile anymore.
-// Will become : `(const char*) u8"stringLiteral`
+namespace {
+#if defined(__cpp_char8_t)
+    const char* toImGuiUtf8(const char8_t* text) {
+        return reinterpret_cast<const char*>(text);
+    }
+#else
+    const char* toImGuiUtf8(const char* text) {
+        return text;
+    }
+#endif
+}
 
 //--------------------------------------------------------------
 void ofApp::setup()
@@ -30,9 +39,8 @@ void ofApp::setup()
         0x0100, 0x01FF, // Polish characters
         0,
     };
-    static const ImWchar* normalCharRanges = ImGui::GetIO().Fonts->GetGlyphRangesDefault();
     static const ImWchar* myCharRanges = polishCharRanges;
-    //myCharRanges = normalCharRanges; // Uncomment to disable polish characters
+    //myCharRanges = ImGui::GetIO().Fonts->GetGlyphRangesDefault(); // Uncomment to disable polish characters
 
     // Set font and keep a reference of it for using it later
     // Font files are located within the data folder.
@@ -132,17 +140,17 @@ void ofApp::draw(){
     // Use 2ndary font
     ImGui::CollapsingHeader("Special characters", ImGuiTreeNodeFlags_Leaf);
 
-    // u8 ensures text is encoded as utf8 from the cpp source code
-    ImGui::Text(u8"Witaj świecie !");
+    // u8 ensures text is encoded as utf8 from the cpp source code.
+    ImGui::TextUnformatted(toImGuiUtf8(u8"Witaj świecie !"));
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(255,255,255,0.5), "<-- one character is not loaded in this font !");
 
     // Custom font has more caracters, allowing to render them all
     ImGui::PushFont(customFont, customFont->LegacySize);
-    ImGui::Text(u8"Witaj świecie !");
+    ImGui::TextUnformatted(toImGuiUtf8(u8"Witaj świecie !"));
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(255,255,255,0.5), "<-- with another font, it's rendered correctly !");
-    ImGui::Text(u8"Some polish characters: ć, ń, ó, ś, ź, ż, ą, ę, ł.");
+    ImGui::TextUnformatted(toImGuiUtf8(u8"Some polish characters: ć, ń, ó, ś, ź, ż, ą, ę, ł."));
     ImGui::PopFont();
     ImGui::Dummy(ImVec2(0,10));
 
@@ -176,7 +184,7 @@ void ofApp::draw(){
     ImGui::TextDisabled("Helps debugging incorrectly rendered characters.");
     if(ImGui::TreeNode("Static string literal")){
         ImGui::DebugTextEncoding("Witaj świecie !"); // incorrect on some platforms (for demo)
-        //ImGui::DebugTextEncoding(u8"Witaj świecie !"); // correct
+        //ImGui::DebugTextEncoding(toImGuiUtf8(u8"Witaj świecie !")); // correct
         ImGui::TreePop();
     }
     if(ImGui::TreeNode("Dynamic text")){

@@ -13,14 +13,14 @@ struct ExampleAppLog
         Clear();
     }
 
-    void    Clear()
+    void Clear()
     {
         Buf.clear();
         LineOffsets.clear();
         LineOffsets.push_back(0);
     }
 
-    void    AddLog(const char* fmt, ...) IM_FMTARGS(2)
+    void AddLog(const char* fmt, ...) IM_FMTARGS(2)
     {
         int old_size = Buf.size();
         va_list args;
@@ -32,7 +32,7 @@ struct ExampleAppLog
                 LineOffsets.push_back(old_size + 1);
     }
 
-    void    Draw(const char* title, bool* p_open = NULL)
+    void Draw(const char* title, bool* p_open = NULL)
     {
         if (!ImGui::Begin(title, p_open))
         {
@@ -155,7 +155,7 @@ void ofApp::drawImGui()
         ImGui::Begin("ofApp gui");
         ImGui::Separator();
         ImGui::Text("Background color :");
-        ImGui::ColorPicker4("##picker", (float*)&ofAppColor);
+        ofxImGui::ColorPicker4("##picker", ofAppColor);
 		ImGui::End();
 
         static bool bShowDemoWindow = false;

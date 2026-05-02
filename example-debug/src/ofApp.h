@@ -125,13 +125,9 @@ class ofApp : public ofBaseApp {
                 ofLogNotice("Window is GLFW");
                 auto GLFWsettings = glfwWin->getSettings();
 #if defined TARGET_OPENGLES
-                if( dynamic_cast< ofGLESWindowSettings* >( &GLFWsettings ) ){
-                    ofLogNotice("OpenGL is GLES") << "Version " << GLFWsettings.glesVersion;
-                }
+                ofLogNotice("OpenGL is GLES") << "Version " << GLFWsettings.glesVersion;
 #else //if defined TARGET_OPENGL
-                if( dynamic_cast< ofGLWindowSettings* >( &GLFWsettings ) ){
-                    ofLogNotice("OpenGL is GL") << "Version " << GLFWsettings.glVersionMajor << "." << GLFWsettings.glVersionMinor ;
-                }
+                ofLogNotice("OpenGL is GL") << "Version " << GLFWsettings.glVersionMajor << "." << GLFWsettings.glVersionMinor ;
 #endif
 
 #ifdef GLFW_HAS_GAMEPAD_SUPPORT
@@ -287,21 +283,13 @@ class ofApp : public ofBaseApp {
                     ImGui::Text("Your oF window seems to be a GLFW window.");
                     ImGui::Text("getPixelScreenCoordScale = %i", glfwWin->getPixelScreenCoordScale());
                     ofGLFWWindowSettings GLFWsettings = glfwWin->getSettings();
-                    if( auto GLESsettings = dynamic_cast< ofGLESWindowSettings* >( &GLFWsettings ) ){
-                        #ifdef TARGET_OPENGLES
-                        ImGui::Text("OpenGL ES version = %i", GLESsettings->glesVersion );
-                        #else
-                        ImGui::Text("OpenGL ES version = (unknown)");
-                        #endif
-                    }
-
-                    if( dynamic_cast< ofGLWindowSettings* >( &GLFWsettings ) ){
-                        #ifndef TARGET_OPENGLES
-                        ImGui::Text("OpenGL version = %i.%i", GLFWsettings.glVersionMajor, GLFWsettings.glVersionMinor) ;
-                        #else
-                        ImGui::Text("OpenGL version = (unknown)");
-                        #endif
-                    }
+                    #ifdef TARGET_OPENGLES
+                    ImGui::Text("OpenGL ES version = %i", GLFWsettings.glesVersion);
+                    ImGui::Text("OpenGL version = (unknown)");
+                    #else
+                    ImGui::Text("OpenGL ES version = (unknown)");
+                    ImGui::Text("OpenGL version = %i.%i", GLFWsettings.glVersionMajor, GLFWsettings.glVersionMinor);
+                    #endif
 
                     // Add GLFW versions and check against pre-3.3, 3.3 or 3.4
                     ImGui::Text("GLFW version : %i.%i rev %i", GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION);

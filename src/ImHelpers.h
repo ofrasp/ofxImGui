@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofGLBaseTypes.h"
+#include "ofColor.h"
 #include "ofParameter.h"
 #include "ofRectangle.h"
 #include "ofTexture.h"
@@ -80,6 +81,15 @@ namespace ofxImGui
 	bool AddParameter(ofParameter<ofColor>& parameter, bool alpha = true);
 	bool AddParameter(ofParameter<ofFloatColor>& parameter, bool alpha = true);
 
+	bool ColorEdit3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit3(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorEdit4(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker3(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker4(const char* label, ofFloatColor& color, ImGuiColorEditFlags flags = 0, const float* ref_col = nullptr);
+	bool ColorPicker3(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0);
+	bool ColorPicker4(const char* label, ofColor& color, ImGuiColorEditFlags flags = 0, const float* ref_col = nullptr);
+
 	bool AddParameter(ofParameter<std::string>& parameter, size_t maxChars = 255, bool multiline = false);
 
 	bool AddParameter(ofParameter<void>& parameter, float width = 0);
@@ -129,7 +139,7 @@ namespace ofxImGui
 #endif
 }
 
-static ImTextureID GetImTextureID(const ofTexture& texture)
+inline ImTextureID GetImTextureID(const ofTexture& texture)
 {
 #ifdef TARGET_OPENGLES
 	if (false) // GLES only has 2d textures ? (to be verified)
@@ -143,13 +153,13 @@ static ImTextureID GetImTextureID(const ofTexture& texture)
     return (ImTextureID)(uintptr_t)texture.texData.textureID;
 }
 
-static ImTextureID GetImTextureID(const ofBaseHasTexture& hasTexture)
+inline ImTextureID GetImTextureID(const ofBaseHasTexture& hasTexture)
 {
     
     return GetImTextureID(hasTexture.getTexture());
 }
 
-static ImTextureID GetImTextureID(GLuint glID)
+inline ImTextureID GetImTextureID(GLuint glID)
 {
     return (ImTextureID)(uintptr_t)glID;
 

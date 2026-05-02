@@ -30,6 +30,9 @@ common:
 	# but if the addon or addon libraries need special search paths they can be
 	# specified here separated by spaces or one per line using +=
 	# ADDON_INCLUDES =
+	# UpdateImGui.sh keeps a full Dear ImGui checkout in libs/imgui_git/ for future
+	# updates. Do not let the OF makefile parser compile or include that clone.
+	ADDON_INCLUDES_EXCLUDE = libs/imgui_git libs/imgui_git/%
 	
 	# any special flag that should be passed to the compiler when using this
 	# addon
@@ -54,6 +57,7 @@ common:
 	# they can be specified here
 	# ADDON_SOURCES =
 	ADDON_SOURCES_EXCLUDE = src/EngineVk.cpp
+	ADDON_SOURCES_EXCLUDE += libs/imgui_git/%
 	
 	# some addons need resources to be copied to the bin/data folder of the project
 	# specify here any files that need to be copied, you can use wildcards like * and ?

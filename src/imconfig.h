@@ -232,10 +232,10 @@ constexpr float ofColorScale = 1.0f/255.0f;
 #define IM_VEC4_CLASS_EXTRA_OF_9 \
     constexpr ImVec4(const ofVec4f& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}                                                                       \
     operator ofVec4f() const { return ofVec4f(x,y,z,w); }                                                                                        \
-    constexpr ImVec4(const glm::vec4& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}                                                                     \
     constexpr ImVec4(const ofColor& color, float alpha) : x(color.r*ofColorScale), y(color.g*ofColorScale), z(color.b*ofColorScale), w(alpha) {} \
     constexpr ImVec4(const ofColor& f) : x(f.r*ofColorScale), y(f.g*ofColorScale), z(f.b*ofColorScale), w(f.a*ofColorScale) {}                   \
-    operator ofColor() const { return ofColor((int) (x*255.0f+0.5f), (int) (y*255.0f+0.5f), (int) (z*255.0f+0.5f), (int) (w*255.0f+0.5f)); }     \
+    explicit operator ofColor() const { return ofColor((int) (x*255.0f+0.5f), (int) (y*255.0f+0.5f), (int) (z*255.0f+0.5f), (int) (w*255.0f+0.5f)); } \
+    constexpr ImVec4(const glm::vec4& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}                                                                     \
     constexpr ImVec4(const ofFloatColor& color, float alpha) : x(color.r), y(color.g), z(color.b), w(alpha) {}                                   \
     constexpr ImVec4(const ofFloatColor& f) : x(f.r), y(f.g), z(f.b), w(f.a) {}                                                                  \
     operator ofFloatColor() const { return ofFloatColor(x, y, z, w); }

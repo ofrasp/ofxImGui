@@ -7,8 +7,12 @@
 #include "ofGLProgrammableRenderer.h"
 #include "GLFW/glfw3.h"
 #include "backends/imgui_impl_glfw.h"
+
 #include "backends/imgui_impl_opengl3.h"
+
+#if !defined(TARGET_OPENGLES)
 #include "backends/imgui_impl_opengl2.h"
+#endif
 
 #if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 0 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
 	#include "backends/imgui_impl_glfw_context_support.h"
@@ -39,11 +43,10 @@ namespace ofxImGui
                 #pragma message "You are using the new Rpi GLFW binding. Please ensure that your raspi-config doesn't use the Legacy video drivers for better performance."
             #endif
 
-            // Warn for GL ES 1 usage (unsupported by imgui)
             if( !ofIsGLProgrammableRenderer() ){
                 ofLogWarning(__FUNCTION__) << "ofxImGui has not been tested with GL ES 1.0 and there's no official imgui backend for it.";
             }
-        #endif // rpi gles
+        #endif
 #endif // debug
 
 		// Store a reference to the current imgui context for event handling
@@ -101,8 +104,10 @@ namespace ofxImGui
 			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with OpenGL2 and ofIsGLProgrammableRenderer()=" << (ofIsGLProgrammableRenderer()?"1":"0");
     #endif
 #endif
+			#if !defined(TARGET_OPENGLES)
             ImGui_ImplOpenGL2_Init();
             ImGui_ImplOpenGL2_CreateDeviceObjects();
+			#endif
         }
 
 		isSetup = true;
@@ -133,9 +138,11 @@ namespace ofxImGui
             ImGui_ImplOpenGL3_Shutdown(); // called by ImGuiDestroyContext() later ?
         }
         else {
+			#if !defined(TARGET_OPENGLES)
             //ImGui_ImplOpenGL2_DestroyFontsTexture(); // called by function below
             //ImGui_ImplOpenGL2_DestroyDeviceObjects(); // Called below
             ImGui_ImplOpenGL2_Shutdown();
+			#endif
         }
 		// Note: Restores OF callbacks; can it happen that of unregistered them already ?
 		ImGui_ImplGlfw_Shutdown();
@@ -153,7 +160,9 @@ namespace ofxImGui
             ImGui_ImplOpenGL3_NewFrame();
         }
         else{
+			#if !defined(TARGET_OPENGLES)
             ImGui_ImplOpenGL2_NewFrame();
+			#endif
         }
         ImGui_ImplGlfw_NewFrame();
     }
@@ -163,10 +172,18 @@ namespace ofxImGui
     void EngineGLFW::render()
 	{
 
+		// Ensure GL is in a compatible state
+#if IMGUI_VERSION_NUM <= 19210 && IMGUI_VERSION_NUM >= 19200
+		// Note: required for ofApps that use ofTexture which can set/leave this to a different value.
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+#endif
+
         if (ofIsGLProgrammableRenderer()) {
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
         else {
+			#if !defined(TARGET_OPENGLES)
             // GLint last_program;
             // glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
             // glUseProgram(0);
@@ -174,8 +191,13 @@ namespace ofxImGui
             //e.g. glBindBuffer(GL_ARRAY_BUFFER, 0), glDisable(GL_TEXTURE_CUBE_MAP).
             ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
             //glUseProgram(last_program);
+			#endif
         }
+        updatePlatformWindows();
+    }
 
+    //--------------------------------------------------------------
+    void EngineGLFW::updatePlatformWindows(){
         // Handle multi-viewports
         ImGuiIO& io = ImGui::GetIO();
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable){
@@ -191,12 +213,16 @@ namespace ofxImGui
 
 	//--------------------------------------------------------------
     bool EngineGLFW::updateFontsTexture(){
+#if IMGUI_VERSION_NUM < 19200
         if (ofIsGLProgrammableRenderer()) {
             return ImGui_ImplOpenGL3_CreateFontsTexture();
         }
         else {
             return ImGui_ImplOpenGL2_CreateFontsTexture();
         }
+#else
+        return true;
+#endif
     }
 
 	//--------------------------------------------------------------
@@ -716,7 +742,7 @@ namespace ofxImGui
 		// Set context
 		if(!setImGuiContext()) return;
 
-		// This one is a little too ahrd to port, let's behave like EngineOpenFrameworks
+		// This one is a little too hard to port, let's behave like EngineOpenFrameworks
 		// ImGui_ImplGlfw_KeyCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), ...);
 
 		int key = event.keycode; // Todo: this seems to be window specific ?

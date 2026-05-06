@@ -40,7 +40,8 @@ One tiny disadvantage of the Glfw backend is that multiwindow-together-with-view
 | Linux   | Yes           | Yes           | Yes           | Yes            | Yes           | Should        |
 | Rpi3    | Should        | Unknown       | Unknown       | Yes            | Yes           | Yes           |
 | Rpi4    | Unknown       | Should        | Should        | Should         | Should        | Should        |
-| iOS     | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Should        | Should        |
+| iOS     | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Yes           | Yes           |
+| WebGL   | *Unavailable* | *Unavailable* | *Unavailable* | Should         | Yes           | Yes           |
 
 *Note: This support table does not take into account software emulated support for graphics APIs.*  
 *Note: GL ES 1 (the fixed pipeline ES shading language) is not natively supported by the native DearImGui backend, but it works with [some dirty hacks](src/gles1CompatibilityHacks.h).*
@@ -54,7 +55,7 @@ Versions are tagged in the git repo.
 
 | ofxImGui version  | ImGui version | Tested oF version |
 |------------------:|---------------|-------------------|
-| ofxImGui 1.91.0   | 1.91.0*       | 0.11 -> 0.12.0 |
+| ofxImGui 1.91.0   | 1.91.0*       | 0.11 -> 0.12.1 |
 | ofxImGui 1.90.0   | 1.90.0*       | 0.11 -> 0.12.0 |
 | ofxImGui 1.89.2   | 1.89.2*       | 0.11 -> 0.11.2 |
 | ofxImGui 1.82     | 1.82*         | 0.11 -> 0.11.2 |
@@ -87,7 +88,7 @@ On OSX, updating GLFW will also show the (cached) window content while resizing 
 | 0.11.2         | pre-3.3.0    | [Link](https://github.com/openframeworks/apothecary/pull/197) |
 | 0.11.2_master  | 3.3.7        | [Link](https://github.com/openframeworks/apothecary/pull/225) | 
 | 0.12.0         | 3.3.8        | [Link](https://github.com/openframeworks/apothecary/commit/bdc421bd28e8b433747759154f29a206d7cc9e41) |
-| 0.12.x         | 3.4          | [Link](https://github.com/openframeworks/apothecary/commit/27b80288fc0e83ebad475b9ee94d042319bf0e3c) |
+| 0.12.1         | 3.4          | [Link](https://github.com/openframeworks/apothecary/blob/fae96e615875a701d48dc29cf4a3be24bc472a07/apothecary/formulas/glfw.sh#L13) |
 
 ImGui restrictions by GLFW version. [Source](https://github.com/ocornut/imgui/blob/v1.91.0-docking/backends/imgui_impl_glfw.cpp#L118-L145).  
 

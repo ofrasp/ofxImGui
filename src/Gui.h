@@ -47,6 +47,7 @@
 // Todo: Maybe we could move setup() to main.cpp, or bind it to an ofxImGuiWindow
 // This could clarify the setup process by explicitly giving is the window handle.
 
+// Todo: Better texture examples / integration (provide an ofxImGuiTexture: an ofTexture force-disabled arbtex?, obsolete loadPixel/loadImage/loadTexture legacy methods : some have memory leaks ?)
 
 namespace ofxImGui {
 	class Gui;
@@ -159,8 +160,11 @@ namespace ofxImGui
         ImFont* addFontFromMemory(void* fontData, int fontDataSize, float fontSize = 13.0f, const ImFontConfig* _fontConfig = nullptr, const ImWchar* _glyphRanges = nullptr, bool _setAsDefaultFont=false );
         bool rebuildFontsTexture();
 
+		// setTheme takes ownership of passed instance
 		void setTheme(BaseTheme* theme);
 
+		// Prefer storing your own textures and forwarding textureids !
+		// Provided for legacy compatibility and ensure textures are in the correct format
 		GLuint loadImage(ofImage& image);
 		GLuint loadImage(const std::string& imagePath);
 
@@ -171,7 +175,9 @@ namespace ofxImGui
 		GLuint loadTexture(ofTexture& texture, const std::string& imagePath);
 		// todo: updateFontTexture ?
 
-        void afterDraw(ofEventArgs& _args); // Listener
+        void autoDraw(ofEventArgs& _args); // draw listener func (own notifier method)
+        ofEvent<ofEventArgs&> beforeDraw; // For listening
+        ofEvent<ofEventArgs&> afterDraw; // For listening
 
 		// Helper window to debug ofxImGui specific stuff, and provide some hints on your setup.
 		void drawOfxImGuiDebugWindow(bool* open=nullptr) const;
@@ -181,10 +187,17 @@ namespace ofxImGui
 		ofRectangle getMainWindowViewportRect(bool returnScreenCoords=false, bool removeMenuBar=true, bool removeDockingAreas=true) const;
 		int getMenuHeight() const;
 		ofRectangle getDockingViewport() const;
+		bool isAutoDrawEnabled() const;
+
+		// Event helpers
+		bool wantsCaptureMouse() const;
+		bool wantsCaptureKeyboard() const;
+
+		std::string iniFileName = ofToDataPath("imgui.ini"); // Default = in data root. Can be set to custom file BEFORE calling gui.setup()
 
     private:
         void render();
-		//static void initialiseForWindow();
+        static void initialiseForWindow();
 
 //#if defined (OFXIMGUI_FORCE_OF_BACKEND)
 //        EngineOpenFrameworks engine;
@@ -197,12 +210,12 @@ namespace ofxImGui
 //#endif
 		ofEventListener autoDrawListener;
 
-		BaseTheme* theme=nullptr; // Todo: move this into ofxImguiContext ?
+		BaseTheme* theme=nullptr; // Todo: move this into ofxImguiContext ? Singleton this ??
 
-		std::vector<ofTexture*> loadedTextures;
+		std::vector<ofTexture*> loadedTextures; // Textures owned by ofxImGui. Fixme: no multi-instance support, singleton this ! shared_ptr ??
 
 		ofRectangle dockingViewport;
-		int menuHeight;
+		int menuHeight = 16;
 
 		void updateDockingVp();
 
@@ -213,5 +226,15 @@ namespace ofxImGui
 
 		//static LinkedList<ofAppBaseWindow*, ofxImGuiContext> imguiContexts; // Window/MasterContext map
 		static std::unordered_map<ofAppBaseWindow*, ofxImGuiContext> imguiContexts; // Window/MasterContext map
+
+		// Input debug helper vars
+#ifdef OFXIMGUI_DEBUG
+#define OFXIMGUI_DEBUG_INPUT_CHARS_LEN 10
+        bool bDebugWindowBoundToOF = false;
+        static bool bInputDebugIgnoreWhenImGuiActive;
+        char lastPressedCharsOF[OFXIMGUI_DEBUG_INPUT_CHARS_LEN] = {"         "};
+        char lastPressedCharsIM[OFXIMGUI_DEBUG_INPUT_CHARS_LEN] = {"         "};
+        void recordOfKeyPresses(ofKeyEventArgs& args);
+#endif
 	};
 }

@@ -47,6 +47,7 @@ namespace ofxImGui
 	static WindowOpen windowOpen;
 
 	bool IsMouseOverGui();
+	bool IsAnyGuiActive();
 
 	const char * GetUniqueName(ofAbstractParameter& parameter);
 	const char * GetUniqueName(const std::string& candidate);
@@ -150,7 +151,6 @@ static ImTextureID GetImTextureID(const ofBaseHasTexture& hasTexture)
 
 static ImTextureID GetImTextureID(GLuint glID)
 {
-    
     return (ImTextureID)(uintptr_t)glID;
 
 }
@@ -181,6 +181,7 @@ bool ofxImGui::AddParameter(ofParameter<ParameterType>& parameter)
 	}
 	if (info == typeid(bool))
 	{
+		// fixme : this is so wrong ! See #139
 		if (ImGui::Checkbox(GetUniqueName(parameter), (bool *)&tmpRef))
 		{
 			parameter.set(tmpRef);

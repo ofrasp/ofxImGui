@@ -23,6 +23,8 @@
 
 #include "ofxImGuiConstants.h"
 
+// Auto-enable math operators, to prevent headaches with ImVecX/ofVecX type conversions.
+//#define IMGUI_DEFINE_MATH_OPERATORS
 
 // USE the OF GL loader (GLEW), otherwise imgui will autodetect the system glew headers
 // Note: Since imgui 1.89.3 there's a new custom loader that we might be able to use too ?
@@ -88,6 +90,12 @@
 // Keeping all code above for testing on RPI and other platforms.
 #define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 //#include "ofConstants.h"
+
+#ifdef TARGET_EMSCRIPTEN
+#define OFXIMGUI_RENDERER_GLES
+#define OFXIMGUI_RENDERER_GLES_3
+#define IMGUI_IMPL_OPENGL_ES3
+#endif
 
 //#ifdef OF_TARGET_OPENGLES
 #ifdef OFXIMGUI_RENDERER_GLES
@@ -216,7 +224,9 @@ constexpr float ofColorScale = 1.0f/255.0f;
 #define IM_VEC2_CLASS_EXTRA_OF_10 // empty
 #endif
 
-#define IM_VEC2_CLASS_EXTRA IM_VEC2_CLASS_EXTRA_OF_9 IM_VEC2_CLASS_EXTRA_OF_10
+#define IM_VEC2_CLASS_EXTRA \
+    IM_VEC2_CLASS_EXTRA_OF_9 \
+    IM_VEC2_CLASS_EXTRA_OF_10
 
 // Todo: Add ofVec3 -> ImVec4 (assuming alpha=100%) ??? (works for colors, maybe not rectangles....
 #define IM_VEC4_CLASS_EXTRA_OF_9 \
@@ -237,7 +247,9 @@ constexpr float ofColorScale = 1.0f/255.0f;
 #else
 #define IM_VEC4_CLASS_EXTRA_OF_10 // empty
 #endif
-#define IM_VEC4_CLASS_EXTRA IM_VEC4_CLASS_EXTRA_OF_9 IM_VEC4_CLASS_EXTRA_OF_10
+#define IM_VEC4_CLASS_EXTRA \
+    IM_VEC4_CLASS_EXTRA_OF_9 \
+    IM_VEC4_CLASS_EXTRA_OF_10
 
 
 #define ImDrawIdx ofIndexType

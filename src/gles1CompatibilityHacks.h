@@ -29,6 +29,19 @@
 	#import <OpenGLES/ES1/glext.h>
 	//#import <OpenGLES/ES2/gl.h>
 	//#import <OpenGLES/ES2/glext.h>
+#elif defined(__EMSCRIPTEN__) || defined(TARGET_EMSCRIPTEN) || defined(TARGET_OPENGLES)
+	#include <GLES/gl.h>
+	#include <GLES/glext.h>
+	#if defined(GL_ES_VERSION_3_0)
+	#include <GLES3/gl3.h>
+	#endif
+	#if defined(GL_ES_VERSION_3_1)
+	#include "GLES3/gl31.h"
+	#endif
+	#include <GLES2/gl2.h>
+	#include <GLES2/gl2ext.h>
+	#define OFXIMGUI_RENDERER_GLES=1
+	#define OFXIMGUI_BACKEND_GLFW
 #else
 	// Other : warn about unsupported platform
 	// If this error throws, there might not be much to do to support them, if your platform supports GLES.

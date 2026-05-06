@@ -29,6 +29,19 @@
 			#include "backends/imgui_impl_glfw_context_support.h"
 		#endif
 #endif
+
+// KeyPress input debug helper
+void appendCharToPressedChars(const char theChar, char (&lastPressedChars)[OFXIMGUI_DEBUG_INPUT_CHARS_LEN]){
+    if(theChar < ' ' || theChar > '~') return; // ignore invisible chars
+    unsigned int i = 0;
+    for(char& c : lastPressedChars){
+        // leave last (ending) char alone, it's a delimiter
+        if(i==OFXIMGUI_DEBUG_INPUT_CHARS_LEN-1) break;
+        if(i+2<sizeof(lastPressedChars)) c = lastPressedChars[i+1];
+        else c = theChar;
+        i++;
+    }
+}
 #endif
 
 //#ifdef OFXIMGUI_BACKEND_GLFW
@@ -57,6 +70,11 @@ namespace ofxImGui
 
         // Note: ofGetWindowPtr() is not correct at this point in multi-window setups.
         // Cannot call ImGui::CreateContext here
+
+        // Fixme: This should be set false between CreateContext() and setup() !
+        // Disable tooltips until setup() is called, they may crash the app otherwise.
+        // ImGuiIO& io = ImGui::GetIO();
+        // io.ConfigErrorRecoveryEnableTooltip = false;
     }
 
 	//--------------------------------------------------------------
@@ -98,6 +116,9 @@ namespace ofxImGui
 			return SetupState::SetupError;
         }
 
+        // Initial docking viewport
+        dockingViewport = ofRectangle(0, 0, _ofWindow->getWidth(), _ofWindow->getHeight());
+
 		// Grab existing ImGui Context
 		//ImGuiContext* existingImGuiContext = ImGui::GetCurrentContext(); // Null on first call ever
 
@@ -115,7 +136,7 @@ namespace ofxImGui
 
 #ifdef OFXIMGUI_DEBUG
 			ofLogNotice("Gui::setup()") << "Context " << context << "/" << context->imguiContext << " already exists in window " << _ofWindow.get() << ", using the existing context as a shared one.";
-			if(autoDraw_) ofLogWarning("Gui::setup()") << "You requested to enable Autodraw, but this is a Slave setting. Not enabling autoDraw.";
+			if(autoDraw_) ofLogWarning("Gui::setup()") << "You requested to enable Autodraw, but this is a Slave instance. Not enabling autoDraw.";
 #endif
         }
         // Create a unique context for this window
@@ -139,7 +160,7 @@ namespace ofxImGui
 			// Enable autodraw
 			if( autoDraw_ && _ofWindow!=nullptr ){
 				context->autoDraw = true;
-				autoDrawListener = _ofWindow->events().draw.newListener( this, &Gui::afterDraw, OF_EVENT_ORDER_AFTER_APP );
+				autoDrawListener = _ofWindow->events().draw.newListener( this, &Gui::autoDraw, OF_EVENT_ORDER_AFTER_APP );
             }
 
 #ifdef OFXIMGUI_DEBUG
@@ -152,10 +173,17 @@ namespace ofxImGui
         ImGuiIO& io = ImGui::GetIO();
 
 		// Dummy call that will crash if the io is invalid --> ie for easier debugging
+#ifdef OFXIMGUI_DEBUG
 		(void)io;
+#endif
 
         // Note : In chaining mode, additional flags can still be set.
         io.ConfigFlags |= customFlags_;
+
+        // Inject touch flags by default on touch-only platforms
+#if defined(OFXIMGUI_TOUCH_EVENTS) && !defined(OFXIMGUI_TOUCH_EVENTS_AUTO_CONFIG)
+        io.ConfigFlags |= ImGuiConfigFlags_IsTouchScreen;
+#endif
 
 		// Already-setup window --> slaves exit early
 		if( !isContextOwned ) {
@@ -181,8 +209,38 @@ namespace ofxImGui
 			io.IniFilename = sIniPath.c_str();
 		}
 
+		// Start engines
 		this->context->engine.setup( _ofWindow.get(), context->imguiContext, context->autoDraw);
 
+		// Load a default font
+		// Fixme: make this optional ? (= less GPU memory).
+		// For now we ensure a default font is always available, for the ease of use.
+		ImFont* defaultFont = nullptr;
+		if(io.Fonts->Fonts.size()==0){
+#ifndef IMGUI_DISABLE_DEFAULT_FONT
+			//defaultFont = io.Fonts->AddFontDefault();
+			ImFontConfig cfg;
+			cfg.SizePixels = 13.0f;
+			defaultFont = io.Fonts->AddFontDefault(&cfg);
+
+            // Set as default
+            if(defaultFont){
+#if IMGUI_VERSION_NUM < 1920
+                rebuildFontsTexture(); // Fixme: could be an optional call to improve loading speeds (only needs to be called once after loading all fonts).
+#endif
+
+                // Ensure the default font is marked default (can be user-overridden later)
+                if(!io.FontDefault){
+                    //io.FontDefault = defaultFont;
+                    setDefaultFont(defaultFont);
+                }
+            }
+#else
+            IM_ASSERT("No font is not set and the default ImGui font has been disabled !");
+#endif
+        }
+
+		// Load a theme
 		if (theme_)
 		{
 			setTheme(theme_);
@@ -193,7 +251,15 @@ namespace ofxImGui
 			setTheme((BaseTheme*)defaultTheme);
 		}
 
-		return SetupState::SetupMaster;
+#ifdef OFXIMGUI_DEBUG
+		// Start keypress input debug helper
+		if(!bDebugWindowBoundToOF){
+			ofAddListener(ofEvents().keyPressed, this, &Gui::recordOfKeyPresses, OF_EVENT_ORDER_BEFORE_APP);
+			bDebugWindowBoundToOF = true;
+		}
+#endif
+
+		return SetupState::Master;
 	}
 
 	//--------------------------------------------------------------
@@ -222,7 +288,7 @@ namespace ofxImGui
             if(loadedTextures[i])
             {
                 delete loadedTextures[i];
-                loadedTextures[i] = NULL;
+                loadedTextures[i] = nullptr;
             }
 		}
 		loadedTextures.clear();
@@ -264,7 +330,13 @@ namespace ofxImGui
 			// Slaves set their context to nullptr without destroying anything
 			context = nullptr;
 		}
-		
+
+		// Unbind debug event listeners
+#ifdef OFXIMGUI_DEBUG
+		if(bDebugWindowBoundToOF){
+			ofRemoveListener(ofEvents().keyPressed, this, &Gui::recordOfKeyPresses, OF_EVENT_ORDER_BEFORE_APP);
+		}
+#endif
 	}
 
     //--------------------------------------------------------------
@@ -287,7 +359,7 @@ namespace ofxImGui
     //--------------------------------------------------------------
     bool Gui::setDefaultFont(int indexAtlasFont) {
         if(context==nullptr){
-            ofLogWarning() << "You must load fonts after gui.setup() ! (ignoring this call)";
+            ofLogWarning("Gui::setDefaultFont()") << "You must load fonts after gui.setup() ! (ignoring this call)";
             return false;
         }
 
@@ -308,7 +380,7 @@ namespace ofxImGui
 
     bool Gui::setDefaultFont(ImFont* _atlasFont){
         if(context==nullptr){
-            ofLogWarning() << "You must load fonts after gui.setup() ! (ignoring this call)";
+            ofLogWarning("Gui::setDefaultFont") << "You must load fonts after gui.setup() ! (ignoring this call)";
             return false;
         }
 
@@ -317,6 +389,7 @@ namespace ofxImGui
 
 		// Don't override default font with nullptr
 		if( _atlasFont != nullptr ){
+			// Loop existing fonts to ensure setting an available font
             for(int i=0; i<io.Fonts->Fonts.size(); ++i){
                 if(io.Fonts->Fonts[i] == _atlasFont){
                     // Set font
@@ -332,13 +405,13 @@ namespace ofxImGui
 	ImFont* Gui::addFont(const std::string & fontPath, float fontSize, const ImFontConfig* _fontConfig, const ImWchar* _glyphRanges, bool _setAsDefaultFont ) {
 
 		if(context==nullptr){
-			ofLogWarning() << "You must load fonts after gui.setup() ! (ignoring this call)";
+			ofLogWarning("Gui::addFont()") << "You must load fonts after gui.setup() ! (ignoring this call)";
 			return nullptr;
 		}
 
-		//ImFontConfig structure allows you to configure oversampling.
-		//By default OversampleH = 3 and OversampleV = 1 which will make your font texture data 3 times larger
-		//than necessary, so you may reduce that to 1.
+		// ImFontConfig structure allows you to configure oversampling.
+		// By default OversampleH = 3 and OversampleV = 1 which will make your font texture data 3 times larger
+		// than necessary, so you may reduce that to 1.
 
 		ImGui::SetCurrentContext(context->imguiContext);
 		ImGuiIO& io = ImGui::GetIO();
@@ -347,43 +420,47 @@ namespace ofxImGui
 		// Especially the raspberry seems to be a version behind. Master Branch / Release 
 		std::string filePath = fontPath; //ofFilePath::getAbsolutePath(fontPath);
 
-        // ensure default font gets loaded once
-        if(io.Fonts->Fonts.size()==0) io.Fonts->AddFontDefault();
-
         ImFont* font = io.Fonts->AddFontFromFileTTF(filePath.c_str(), fontSize, _fontConfig, _glyphRanges);
 
 		if (font != nullptr){
-			if(_setAsDefaultFont) setDefaultFont(font);
+#if IMGUI_VERSION_NUM < 1920
+			// Fixme: could be an optional call to improve loading speeds (only needs to be called once after loading all fonts).
 			rebuildFontsTexture();
+#endif
+
+			if(_setAsDefaultFont) setDefaultFont(font);
+
 			return font;
 		}
-		else {
-			return nullptr;
-		}
+
+		// delete font; // Nope, handled by ImGui !
+
+		return nullptr;
 	}
 	//--------------------------------------------------------------
 	ImFont* Gui::addFontFromMemory(void* fontData, int fontDataSize, float fontSize, const ImFontConfig* _fontConfig, const ImWchar* _glyphRanges, bool _setAsDefaultFont ) {
 
 		if(context==nullptr){
-		  ofLogWarning() << "You must load fonts after gui.setup() ! (ignoring this call)";
+		  ofLogWarning("Gui::addFontFromMemory()") << "You must load fonts after gui.setup() ! (ignoring this call)";
 		  return nullptr;
 		}
 
-		//ImFontConfig structure allows you to configure oversampling.
-		//By default OversampleH = 3 and OversampleV = 1 which will make your font texture data 3 times larger
-		//than necessary, so you may reduce that to 1.
+		// ImFontConfig structure allows you to configure oversampling.
+		// By default OversampleH = 3 and OversampleV = 1 which will make your font texture data 3 times larger
+		// than necessary, so you may reduce that to 1.
 
 		ImGui::SetCurrentContext(context->imguiContext);
 		ImGuiIO& io = ImGui::GetIO();
 
-		// ensure default font gets loaded once
-		if(io.Fonts->Fonts.size()==0) io.Fonts->AddFontDefault();
 
 		ImFont* font = io.Fonts->AddFontFromMemoryTTF( fontData, fontDataSize, fontSize, _fontConfig, _glyphRanges);
 
 		if (font != nullptr){
-			if(_setAsDefaultFont) setDefaultFont(font);
+#if IMGUI_VERSION_NUM < 1920
+			// Fixme: could be an optional call to improve loading speeds (only needs to be called once after loading all fonts).
 			rebuildFontsTexture();
+#endif
+			if(_setAsDefaultFont) setDefaultFont(font);
 			return font;
 		}
 		else {
@@ -393,8 +470,11 @@ namespace ofxImGui
 
 	//--------------------------------------------------------------
 	bool Gui::rebuildFontsTexture(){
+#if IMGUI_VERSION_NUM >= 19200
+		return true; // not needed anymore = done !
+#else
 		if(context==nullptr){
-		  ofLogWarning() << "You must build fonts after gui.setup() ! (ignoring this call)";
+		  ofLogWarning("Gui::rebuildFontsTexture()") << "You must build fonts after gui.setup() ! (ignoring this call)";
 		  return false;
 		}
 
@@ -406,6 +486,7 @@ namespace ofxImGui
 			return context->engine.updateFontsTexture();
 		}
 		return false;
+#endif
 	}
 
 	//--------------------------------------------------------------
@@ -456,6 +537,7 @@ namespace ofxImGui
 	//--------------------------------------------------------------
 	GLuint Gui::loadImage(ofImage& image)
 	{
+		// Note: illegal : loads pixels to texture, and texture is never kept ?!
 		return loadPixels(image.getPixels());
 	}
 
@@ -468,10 +550,17 @@ namespace ofxImGui
 	//--------------------------------------------------------------
 	GLuint Gui::loadTexture(const std::string& imagePath)
 	{
-		ofDisableArbTex();
+		const bool isUsingArb = ofGetUsingArbTex();
+		if (isUsingArb)
+		{
+			ofDisableArbTex();
+		}
 		ofTexture* texture = new ofTexture();
 		ofLoadImage(*texture, imagePath);
-		ofEnableArbTex();
+		if (isUsingArb)
+		{
+			ofEnableArbTex();
+		}
 		loadedTextures.push_back(texture);
 		return texture->getTextureData().textureID;
 	}
@@ -479,7 +568,7 @@ namespace ofxImGui
 	//--------------------------------------------------------------
 	GLuint Gui::loadTexture(ofTexture& texture, const std::string& imagePath)
 	{
-		bool isUsingArb = ofGetUsingArbTex();
+		const bool isUsingArb = ofGetUsingArbTex();
 		if (isUsingArb)
 		{
 			ofDisableArbTex();
@@ -518,13 +607,23 @@ namespace ofxImGui
 
 		ImGui::SetCurrentContext(context->imguiContext);
 
+#if IMGUI_VERSION_NUM < 19190
         // Help people loading fonts incorrectly
         ImGuiIO& io = ImGui::GetIO();
-        IM_ASSERT( io.Fonts->IsBuilt() );
+        IM_ASSERT( io.Fonts->IsBuilt() ); // Fonts incorrectly setup
+        //IM_ASSERT( io.Fonts->Fonts.Size > 0 && io.Fonts->TexIsBuilt); // Fonts incorrectly setup
+#endif
 
         //std::cout << "New Frame in context " << context << " in window " << ofGetWindowPtr() << " (" << ofGetWindowPtr()->getWindowSize().x << ")" << std::endl;
 		context->engine.newFrame();
         ImGui::NewFrame();
+
+        // Sync IO debug chars
+#ifdef OFXIMGUI_DEBUG
+        if(ImGui::GetIO().InputQueueCharacters.Size > 0) for(ImWchar c : ImGui::GetIO().InputQueueCharacters){
+            appendCharToPressedChars(static_cast<char>(c), lastPressedCharsIM);
+        }
+#endif
 
 		context->isRenderingFrame = true;
 	}
@@ -587,10 +686,15 @@ namespace ofxImGui
     void Gui::render(){
         if( context==nullptr ) return;
 
+        ofEventArgs a;
+        beforeDraw.notify(a);
+
 		ImGui::SetCurrentContext(context->imguiContext);
         ImGui::Render();
 		context->engine.render();
 		context->isRenderingFrame = false;
+
+        afterDraw.notify(a);
     }
 
 	//--------------------------------------------------------------
@@ -611,7 +715,7 @@ namespace ofxImGui
 	}
 
 	//--------------------------------------------------------------
-    void Gui::afterDraw( ofEventArgs& ){
+	void Gui::autoDraw( ofEventArgs& ){
 
         // This function is registered after ofApp::draw() to honor autodraw in shared context mode.
 		if(context && context->isRenderingFrame ){
@@ -1052,13 +1156,29 @@ namespace ofxImGui
 						ImGui::Text("Display scale: %.3f x %.3f", io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
 						ImGui::Text("Ini filename : %s", io.IniFilename);
 						ImGui::Text("Loaded Fonts : %i", io.Fonts->Fonts.size());
+#if IMGUI_VERSION_NUM < 19190
 						for(auto& font : io.Fonts->Fonts){
 							ImGui::BulletText("%s", font->ConfigData->Name);
+
                             if(font == io.FontDefault){
                                 ImGui::SameLine();
                                 ImGui::TextDisabled("Default");
                             }
 						}
+#else
+						for(auto& font : io.Fonts->Fonts){
+							ImGui::BulletText("%s", font->GetDebugName());
+
+                            if(font == io.FontDefault){
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("Default");
+                            }
+                        }
+                        ImGui::Text("Loaded Fonts Sources : %i", io.Fonts->Sources.size());
+                        for(auto& fontSource : io.Fonts->Sources){
+                            ImGui::BulletText("%s [size=%.0f]", fontSource.Name, fontSource.SizePixels);
+                        }
+#endif
 						ImGui::TextWrapped("");
 
 						// Backend Flags
@@ -1069,6 +1189,8 @@ namespace ofxImGui
 						ImGui::PopStyleColor();
 						ImGuiBackendFlags backend_flags = io.BackendFlags;
 						ImGui::CheckboxFlags("HasGamepad",             &backend_flags, ImGuiBackendFlags_HasGamepad);
+						ImGui::SameLine();
+						ImGui::TextDisabled("(and gamepad is detected)");
 						ImGui::CheckboxFlags("HasMouseCursors",        &backend_flags, ImGuiBackendFlags_HasMouseCursors);
 						ImGui::CheckboxFlags("HasSetMousePos",         &backend_flags, ImGuiBackendFlags_HasSetMousePos);
 						ImGui::CheckboxFlags("PlatformHasViewports",   &backend_flags, ImGuiBackendFlags_PlatformHasViewports);
@@ -1273,7 +1395,7 @@ namespace ofxImGui
 					ImGui::TextWrapped("Here's how you are currently bound :");
 	#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 0
 					ImGui::Bullet(); ImGui::TextWrapped("GLFW --> OpenFrameworks --> ofxImGui --> ImGui");
-					ImGui::Bullet(); ImGui::TextWrapped("ImGui input is bound to ofEvents and directly send to ImGuiIO, bypassing the need for imgui_impl_glfw callbacks (custom backend implementation).\nEvent conversion is needed and might loose some non-crucial UX event data.");
+					ImGui::Bullet(); ImGui::TextWrapped("ImGui input is bound to ofEvents and directly send to ImGuiIO, bypassing the need for imgui_impl_glfw callbacks (custom backend implementation).\nEvent conversion is needed and might lose some non-crucial UX event data.");
 	#else
 		#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
 					ImGui::Bullet(); ImGui::TextWrapped("Primary viewports (ofAppBaseWindows) :\nGLFW --> ofxImGui --> ImGui --> OpenFrameworks");
@@ -1298,12 +1420,141 @@ namespace ofxImGui
 					ImGui::EndTabItem();
 				}
 
+				// Input TAB
+				if (ImGui::BeginTabItem("Input tests")){
+
+					ImGui::Dummy({10,10});
+					ImGui::TextWrapped("This window helps debugging how user input is handled.");
+
+					ImGui::Dummy({10,10});
+					ImGui::SeparatorText("Key and mouse press tests");
+					if(ImGui::BeginTable("press-inputs", 4)){
+						bool isAnyImGuiKeyDown = false;
+						for (ImGuiKey key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; key = (ImGuiKey)(key + 1)){
+							if(ImGui::IsKeyDown(key)){
+								isAnyImGuiKeyDown = true;
+								break;
+							}
+
+							// Additional keys are non-keyboard
+							if(key > ImGuiKey_Oem102) break;
+						}
+
+						const bool ofMousePressed = ofGetMousePressed(OF_MOUSE_BUTTON_1);
+						const bool ofKeyPressed = ofGetKeyPressed();
+						ImGui::TableSetupColumn("Input");
+						ImGui::TableSetupColumn("ofCoreEvents");
+						ImGui::TableSetupColumn("ofAppFiltered");
+						ImGui::TableSetupColumn("ImGui IO");
+						ImGui::TableHeadersRow();
+
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("isLeftMousePressed");
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", ofMousePressed);
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", 1*(ofMousePressed && !wantsCaptureMouse()));
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", ImGui::IsMouseDown(ImGuiMouseButton_Left));
+
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("isAnyKeyPressed");
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", ofKeyPressed);
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", 1*(ofKeyPressed && !wantsCaptureKeyboard()));
+						ImGui::TableNextColumn();
+						ImGui::Text("%i", 1*isAnyImGuiKeyDown);
+
+						ImGui::EndTable();
+					}
+					ImGui::TextDisabled("ofCoreEvents and ImGui IO should report the same.");
+					ImGui::TextDisabled("ofAppFiltered should stay off when ImGui is consumeing them.");
+
+					ImGui::Dummy({10,10});
+					ImGui::SeparatorText("Character Input");
+					ImGui::TextWrapped("The following strings track keypress history from ImGui and OpenFrameworks.");
+					ImGui::TextWrapped("When ImGui \"consumes\" the key, it should not append to both of these.");
+
+					ImGui::Dummy({10,10});
+					ImGui::Checkbox("Ignore when ImGuiWantCaptureKeyboard", &bInputDebugIgnoreWhenImGuiActive);
+
+					ImGui::Dummy({10,10});
+					ImGui::BulletText("ofEvents()");
+					ImGui::SameLine();
+					ImGui::BeginGroup();
+					ImGui::Text("Chars: ");
+					static char buf[4] = {' ',' ',' ','\0'};
+					unsigned int i = 0u;
+					for(const char& c : lastPressedCharsOF){
+						ImGui::SameLine();
+						buf[0] = (c >= ' '&& c <= '~')?c:' ';
+						ImGui::Text("%s", buf);
+						i++;
+						if(i==9u) break;
+					}
+					ImGui::Text("Nums :");
+					i = 0u;
+					for(const char& c : lastPressedCharsOF){
+						ImGui::SameLine();
+						ImGui::Text("%03i", (int)c);
+						i++;
+						if(i==9u) break;
+					}
+					ImGui::EndGroup();
+
+					ImGui::BulletText("ImGui.IO  ");
+					ImGui::SameLine();
+					ImGui::BeginGroup();
+					ImGui::Text("Chars: ");
+					i = 0u;
+					for(const char& c : lastPressedCharsIM){
+						ImGui::SameLine();
+						buf[0] = (c >= ' '&& c <= '~')?c:' ';
+						ImGui::Text("%s", buf);
+						i++;
+						if(i==9u) break;
+					}
+					i = 0u;
+					ImGui::Text("Nums :");
+					for(const char& c : lastPressedCharsIM){
+						ImGui::SameLine();
+						ImGui::Text("%03i", (int)c);
+						i++;
+						if(i==9u) break;
+					}
+
+					if(bInputDebugIgnoreWhenImGuiActive)
+						ImGui::TextDisabled("OF should not append imgui-consumed keypresses.");
+					else
+						ImGui::TextDisabled("Both should remain identical (except repeats).");
+
+					ImGui::EndGroup();
+
+					ImGui::Dummy({10,10});
+					static char tmpText[20];
+					ImGui::InputText("Dummy Input", tmpText, 20);
+					ImGui::TextDisabled("Write here to catch imgui input events !");
+
+					// Window pop-out warning
+					if(!(ImGui::GetCurrentWindow()->Viewport->Flags & ImGuiViewportFlags_OwnedByApp)){
+						ImGui::Dummy({10,10});
+						ImGui::TextWrapped("WARNING!\nThis window is popped-out, please put it back into the main ofWindow to ensure events are correctly tracked !");
+					}
+
+					ImGui::EndTabItem();
+				}
+
 				ImGui::EndTabBar();
 			} // End tabs
 		}
 		// Close window space
 		ImGui::End();
 
+#else // OFXIMGUI_DEBUG
+		ImGui::TextDisabled("Disabled.\nOnly available when `OFXIMGUI_DEBUG` is set.");
 #endif // OFXIMGUI_DEBUG
 	}
 
@@ -1322,9 +1573,9 @@ namespace ofxImGui
             // Get docking host window
             ImGuiWindow* window = ImGui::FindWindowByName(label);
             if(window){
-                // Like ImGui::DockSpaceOverViewport
-                static const std::string dockSpaceId = "DockSpace";
-                ImGuiID dockNodeID = ImGui::GetIDWithSeed(&*dockSpaceId.cbegin(), &*dockSpaceId.cend(), window->ID);
+                // Like ImGui::DockSpaceOverViewport, but within a non-current window
+                const char dockSpaceId[] = "DockSpace"; // ImGui version : ImGui::GetID("DockSpace");
+                ImGuiID dockNodeID = ImGui::GetIDWithSeed(dockSpaceId, nullptr, window->ID);
 
                 ImGuiDockNode* dockNode = ImGui::DockBuilderGetNode(dockNodeID);
 
@@ -1404,8 +1655,28 @@ namespace ofxImGui
 		return dockingViewport;
 	}
 
+	bool Gui::isAutoDrawEnabled() const {
+		return context->autoDraw;
+	}
+
+	bool Gui::wantsCaptureMouse() const {
+		return ImGui::GetIO().WantCaptureMouse;
+	}
+
+	bool Gui::wantsCaptureKeyboard() const {
+		return ImGui::GetIO().WantCaptureKeyboard;
+	}
+
     // Initialise statics
 	//LinkedList<ofAppBaseWindow, ofxImGuiContext> Gui::imguiContexts = {};
 	std::unordered_map<ofAppBaseWindow*, ofxImGuiContext> Gui::imguiContexts = {};
+
+#ifdef OFXIMGUI_DEBUG
+	void Gui::recordOfKeyPresses(ofKeyEventArgs &args){
+		if(bInputDebugIgnoreWhenImGuiActive && ImGui::GetIO().WantCaptureKeyboard) return;
+		if(!args.isRepeat) appendCharToPressedChars(args.key, lastPressedCharsOF);
+	}
+	bool Gui::bInputDebugIgnoreWhenImGuiActive = true;
+#endif
 }
 

@@ -10,7 +10,7 @@
 #include "LinkedList.hpp"
 
 // Fwd declarations
-class ImGui_ImplGlfw_Data;
+struct ImGui_ImplGlfw_Data;
 
 // Some global vars
 LinkedList<GLFWwindow, ImGuiContext*> ImGui_ImplGlfw_ScopedContext::Contexts = {};

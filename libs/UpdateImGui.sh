@@ -24,7 +24,11 @@ VERSION_1_90_1=2dc85e6e # 1.90.1
 VERSION_1_90_9=3369cbd2 # 1.90.9
 VERSION_1_91_0=139e99ca # 1.91.0
 VERSION_1_91_5=368123a # 1.91.5
-VERSION_SHA=$VERSION_1_91_5
+VERSION_1_91_9b=4806a19 # 1.91.5
+VERSION_1_92_0=adfa536 # 1.92.0
+VERSION_1_92_1=44aa9a4 # 1.92.1
+VERSION_1_92_5=3912b3d # 1.92.5
+VERSION_SHA=$VERSION_1_92_5
 # ------------------
 
 echo "\nHello,"
@@ -73,7 +77,7 @@ cp ./imgui_git/backends/imgui_impl_opengl3_loader.h ./imgui/backends/imgui_impl_
 
 # Source files
 echo "Copying source files..."
-mkdir -p ./imgui_git/src
+mkdir -p ./imgui/src
 cp ./imgui_git/imgui_demo.cpp		./imgui/src/imgui_demo.cpp
 cp ./imgui_git/imgui_draw.cpp		./imgui/src/imgui_draw.cpp
 cp ./imgui_git/imgui_internal.h		./imgui/src/imgui_internal.h
@@ -88,7 +92,7 @@ cp ./imgui_git/LICENSE.txt			./imgui/src/LICENSE.txt
 
 # Copy some docs
 echo "Copying some docs..."
-mkdir -p ./imgui_git/docs
+mkdir -p ./imgui/docs
 #cp ./imgui_git/docs/ ./imgui/docs
 mv ./imgui_git/docs/BACKENDS.md		./imgui/docs/BACKENDS.md
 mv ./imgui_git/docs/CHANGELOG.txt	./imgui/docs/CHANGELOG.txt
@@ -96,7 +100,7 @@ mv ./imgui_git/docs/README.md		./imgui/docs/README.md
 
 #copy extras
 echo "Copying extras..."
-mkdir -p ./imgui_git/extras
+mkdir -p ./imgui/extras
 cp ./imgui_git/misc/cpp/imgui_stdlib.cpp ./imgui/extras/imgui_stdlib.cpp
 cp ./imgui_git/misc/cpp/imgui_stdlib.h ./imgui/extras/imgui_stdlib.h
 
@@ -153,7 +157,7 @@ else
 	# This causes the native backend to fail linking, the of-version hasn't got glfwGetMonitorWorkarea which was added only in the final version
 	# before: #define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3300) // 3.3+ glfwGetMonitorWorkarea
 	# after : #define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3301) // 3.3+ glfwGetMonitorWorkarea
-	gsed -i '/^#define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3300) \/\/ 3.3+ glfwGetMonitorWorkarea$/i #if defined(TARGET_OSX) || defined(TARGET_WIN32) \/\/ BEGIN CUSTOM OFXIMGUI LINES\n#define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3301) \/\/ 3.3+ glfwGetMonitorWorkarea\n#else' ./imgui/backends/imgui_impl_glfw.cpp
+	gsed -i '/^#define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3300) \/\/ 3.3+ glfwGetMonitorWorkarea$/i #if defined(TARGET_OSX) || defined(TARGET_WIN32) \/\/ BEGIN CUSTOM OFXIMGUI LINES\n#define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= OFXIMGUI_VERSION_GLFW_3300) \/\/ 3.3+ glfwGetMonitorWorkarea\n#else' ./imgui/backends/imgui_impl_glfw.cpp
 	gsed -i '/^#define GLFW_HAS_MONITOR_WORK_AREA      (GLFW_VERSION_COMBINED >= 3300) \/\/ 3.3+ glfwGetMonitorWorkarea$/a #endif \/\/ END CUSTOM OFXIMGUI LINES' ./imgui/backends/imgui_impl_glfw.cpp
 
 	# Obj-c ARC fixes // of_v0.12.0+

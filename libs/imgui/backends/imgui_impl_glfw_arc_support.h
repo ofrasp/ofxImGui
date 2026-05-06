@@ -8,6 +8,8 @@
 
 #pragma once
 
+// Required for non-Clang compiler support
+// Thanks to @GitBruno : https://github.com/PlaymodesStudio/ofxImGuiSimple/issues/3#issuecomment-2586343914
 #ifndef __has_feature         // Optional of course
   #define __has_feature(x) 0  // Compatibility with non-clang compilers
 #endif

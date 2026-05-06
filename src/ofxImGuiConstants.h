@@ -14,6 +14,22 @@
 // Grab ofConstants
 #include "ofConstants.h"
 
+// Let projects define their own settings by providing an `ofximguiconfig.h`, like `imconfig.h`
+// Only works on C++17 and above
+#if (__cplusplus >= 201703L)
+#define ofxImGui_HAS_INCLUDE(x) __has_include(x)
+#else
+#define ofxImGui_HAS_INCLUDE(x) false
+#endif
+#if (__cplusplus >= 201703L) && __has_include("ofximguiconfig.h")
+#   ifdef DEBUG
+#   	pragma message "ofxImGui : Loading custom config file `ofximguiconfig.h` !"
+#   endif
+#	include "ofximguiconfig.h"
+#endif
+
+
+
 // OFXIMGUI_DEBUG
 #ifndef OFXIMGUI_DEBUG
 	// Uncomment to enable debugging by default
@@ -36,6 +52,23 @@
 	#define OFXIMGUI_COMPILER_MESSAGE(X) PRAGMA_MESSAGE(message X)
 #else
 	#define OFXIMGUI_COMPILER_MESSAGE(X)
+#endif
+
+// Touch events support ?
+// - - - - - - - - - - - - - - - -
+// Todo: add explicit compiler flag so devices such as Windows/Linux with TouchScreens can use it too ?
+#if defined(TARGET_OF_IOS) || defined(TARGET_OF_ANDROID)
+	#define OFXIMGUI_TOUCH_EVENTS
+	#define OFXIMGUI_FORCE_OF_BACKEND // Note: force it bcoz there will probably never be GLFW support on mobile devices ?
+#endif
+
+#if defined(__EMSCRIPTEN__) || defined(TARGET_EMSCRIPTEN) || defined(TARGET_OPENGLES)
+    #define OFXIMGUI_BACKEND_GLFW
+	#define OFXIMGUI_RENDERER_GLES_2
+	#define IMGUI_IMPL_OPENGL_ES3
+    #define OFXIMGUI_RENDERER_GLES_3
+#elif defined(TARGET_RASPBERRY_PI) || defined(TARGET_OF_IOS)
+	#define OFXIMGUI_RENDERER_GLES
 #endif
 
 // Platform backend selection
@@ -67,7 +100,7 @@
 
 // Default backend : openframeworks
 #ifndef OFXIMGUI_LOADED_BACKEND
-	OFXIMGUI_COMPILER_MESSAGE("ofxImGui is compiling with the default openFrameworks backend.")
+	OFXIMGUI_COMPILER_MESSAGE("ofxImGui is compiling with the non-default openFrameworks backend.")
 	#define OFXIMGUI_LOADED_BACKEND "OpenFrameworks"
 	#define OFXIMGUI_BACKEND_OPENFRAMEWORKS
 #endif
@@ -163,9 +196,4 @@
 // Prevent using this flag in code
 #undef OFXIMGUI_GLFW_FIX_MULTICONTEXT
 
-// Touch events support ?
-// - - - - - - - - - - - - - - - -
-// Todo: add explicit compiler flag so devices such as Windows/Linux with TouchScreens can use it too ?
-#if defined(TARGET_OF_IOS) || defined(TARGET_ANDROID)
-	#define OFXIMGUI_TOUCH_EVENTS
-#endif
+

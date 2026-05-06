@@ -25,15 +25,12 @@ namespace ofxImGui {
 }
 
 // A scoped struct to set the correct context and restores it when destroyed
-// Reduces
+// Reduces amount of code changes in original lib code
 struct ImGui_ImplGlfw_ScopedContext {
 		friend class ofxImGui::Gui;
 	public:
-		inline ImGui_ImplGlfw_ScopedContext(GLFWwindow* window): prevContext(ImGui::GetCurrentContext()){
-			ImGuiContext* context = Contexts.findData(window);
-			if(context){
-				ImGui::SetCurrentContext(context);
-			}
+		ImGui_ImplGlfw_ScopedContext(GLFWwindow* window) : prevContext(calcPrevContext(window)){
+
 		}
 		~ImGui_ImplGlfw_ScopedContext(){
 			if(prevContext != nullptr){
@@ -48,6 +45,17 @@ struct ImGui_ImplGlfw_ScopedContext {
 		}
 
 	private:
+		static ImGuiContext* calcPrevContext(GLFWwindow* window){
+			ImGuiContext* prevContext = ImGui::GetCurrentContext();
+			if(prevContext){
+				ImGuiContext* context = Contexts.findData(window);
+				if(context && context != prevContext){
+					ImGui::SetCurrentContext(context);
+					return prevContext;
+				}
+			}
+			return (ImGuiContext*) nullptr;
+		}
 		ImGuiContext* const prevContext;
 		// Contains all standalone viewport windows.
 		static LinkedList<GLFWwindow, ImGuiContext*> Contexts;
@@ -64,6 +72,33 @@ inline void ImGui_ImplGlfw_RemoveWindowContext(GLFWwindow* window){
 // Todo: set context for :
 // - ImGui_ImplGlfw_UpdateKeyModifiers ?
 // - ImGui_ImplGlfw_MonitorCallback ?
+
+// Handle GLFW capabilities hack for OF using in-between GLFW version (non-realease, master branch)
+// Corrects the IMGUI detection to the features that the OF version has.
+// More info in Developers.md
+#define GLFW_RESIZE_NESW_CURSOR
+#define GLFW_MOUSE_PASSTHROUGH
+#ifndef OFXIMGUI_GLFW_NO_VERSION_HACKS
+#if OF_VERSION_MAJOR == 0
+#	if OF_VERSION_MINOR == 11
+#		if OF_VERSION_PATCH == 0 // 0.11.0 has GLFW pre-3.3.0
+#			define OFXIMGUI_VERSION_GLFW_3300 3301
+#		elif OF_VERSION_PATCH == 1 // 0.11.1 has GLFW 3.3.0
+#		elif OF_VERSION_PATCH == 2 // 0.11.2 has GLFW pre-3.3.0
+#			define OFXIMGUI_VERSION_GLFW_3300 3301
+#		endif
+#	elif OF_VERSION_MINOR == 12
+#		if OF_VERSION_PATCH == 0 // 0.12.0 has GLFW 3.3.8
+#		elif OF_VERSION_PATCH == 1 // 0.12.0 has GLFW 3.4
+#		endif
+#	endif
+#endif
+#endif
+
+// Default value
+#ifndef OFXIMGUI_VERSION_GLFW_3300
+#	define OFXIMGUI_VERSION_GLFW_3300 3300
+#endif
 
 #else
 // Define classes, compiler should strip all in optimisation steps as it's just dummy code.

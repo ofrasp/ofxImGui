@@ -45,7 +45,7 @@ namespace ofxImGui
 	{
 	public:
 		EngineGLFW(){
-			std::cout << "New GLFWEngine " << this << std::endl;
+			//std::cout << "New GLFWEngine " << this << std::endl;
 		}
 		~EngineGLFW()
 		{
@@ -58,6 +58,7 @@ namespace ofxImGui
 
         void newFrame() override;
         void render() override;
+        void updatePlatformWindows(); // Not recommended to call manually
 
         bool updateFontsTexture() override;
 

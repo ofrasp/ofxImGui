@@ -263,11 +263,13 @@ namespace ofxImGui
 
 		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the ofxImGui ones which will then call the OF and ImGui ones while adding multi-context support.";
 	#else
-		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the imgui_impl_glfw ones. You will not have multi-window nor multi-context support. This can be enabled by defining OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP=1.";
 		#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
+		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the imgui_impl_glfw ones. Multi-context support is enabled via OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP. For full multi-window support, define OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP=1.";
 		// Register window at 2ndary
 		mainGLFWWindow = glfwWindowPtr;
 		ImGui_ImplGlfw_ScopedContext::RegisterWindowContext(glfwWindowPtr, this->imguiContext);
+		#else
+		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the imgui_impl_glfw ones. You will not have multi-window nor multi-context support. This can be enabled by defining OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP=1 or OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP=1.";
 		#endif
 	#endif
 		// - - - - - - - - - - -

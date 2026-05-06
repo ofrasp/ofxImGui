@@ -30,10 +30,15 @@ common:
 	# but if the addon or addon libraries need special search paths they can be
 	# specified here separated by spaces or one per line using +=
 	# ADDON_INCLUDES =
+	# UpdateImGui.sh keeps a full Dear ImGui checkout in libs/imgui_git/ for future
+	# updates. Do not let the OF makefile parser compile or include that clone.
+	ADDON_INCLUDES_EXCLUDE = libs/imgui_git libs/imgui_git/%
 	
 	# any special flag that should be passed to the compiler when using this
 	# addon
-	# ADDON_CFLAGS =
+
+	# Automatically enable ofxImGui features within other ofxAddons
+	ADDON_CFLAGS = -DofxAddons_ENABLE_IMGUI
 	
 	# any special flag that should be passed to the linker when using this
 	# addon, also used for system libraries with -lname
@@ -51,6 +56,8 @@ common:
 	# to include files in different places or a different set of files per platform
 	# they can be specified here
 	# ADDON_SOURCES =
+	ADDON_SOURCES_EXCLUDE = src/EngineVk.cpp
+	ADDON_SOURCES_EXCLUDE += libs/imgui_git/%
 	
 	# some addons need resources to be copied to the bin/data folder of the project
 	# specify here any files that need to be copied, you can use wildcards like * and ?
@@ -65,12 +72,19 @@ linux64:
 linux:
 
 linuxarmv6l:
-	#TODO needs EngineGLFW.cpp exclude 
+	#ADDON_CFLAGS += -DOFXIMGUI_DEBUG
+	ADDON_CFLAGS += -DIMGUI_IMPL_OPENGL_ES2
+	#ADDON_CFLAGS += -DIMGUI_IMPL_OPENGL_ES3
+	#ADDON_CFLAGS += -DUSE_PI_LEGACY
+	#ADDON_LDFLAGS += -lGL
 
 	
 linuxarmv7l:
-	#TODO needs EngineGLFW.cpp exclude 
-	
+	#ADDON_CFLAGS += -DOFXIMGUI_DEBUG
+	ADDON_CFLAGS += -DIMGUI_IMPL_OPENGL_ES2
+	#ADDON_CFLAGS += -DIMGUI_IMPL_OPENGL_ES3
+	#ADDON_CFLAGS += -DUSE_PI_LEGACY
+
 msys2:
 
 android/armeabi:	
@@ -79,5 +93,12 @@ android/armeabi-v7a:
 
 ios:
 	# osx/iOS only, any framework that should be included in the project
-
-
+	ADDON_CFLAGS += -DIMGUI_IMPL_OPENGL_ES2
+#	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_opengl2.cpp
+#	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_opengl2.h
+#	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_opengl3.cpp
+#	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_opengl3.h
+	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_glfw.cpp
+	ADDON_SOURCES_EXCLUDE += libs/imgui/backends/imgui_impl_glfw.h
+	ADDON_SOURCES_EXCLUDE += src/EngineGLFW.cpp
+	ADDON_SOURCES_EXCLUDE += src/EngineGLFW.h

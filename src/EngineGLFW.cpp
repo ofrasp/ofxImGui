@@ -1,518 +1,810 @@
+#include "ofxImGuiConstants.h"
 #include "EngineGLFW.h"
 
-#if !defined(TARGET_OPENGLES) && !defined(OF_TARGET_API_VULKAN)
+#ifdef OFXIMGUI_BACKEND_GLFW
 
 #include "ofAppGLFWWindow.h"
 #include "ofGLProgrammableRenderer.h"
 #include "GLFW/glfw3.h"
+#include "backends/imgui_impl_glfw.h"
+
+#include "backends/imgui_impl_opengl3.h"
+
+#if !defined(TARGET_OPENGLES)
+#include "backends/imgui_impl_opengl2.h"
+#endif
+
+#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 0 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
+	#include "backends/imgui_impl_glfw_context_support.h"
+#endif
+
 
 namespace ofxImGui
 {
 	GLuint EngineGLFW::g_FontTexture = 0;
 
 	//--------------------------------------------------------------
-	void EngineGLFW::setup(bool autoDraw)
+	void EngineGLFW::setup(ofAppBaseWindow* _window, ImGuiContext* _imguiContext, bool autoDraw)
 	{
-		if (isSetup) return;
+        if (isSetup){
+#ifdef OFXIMGUI_DEBUG
+            ofLogNotice("EngineGLFW::setup()") << "Ignoring glfw setup, already bound." << std::endl;
+#endif
+            return;
+        }
+#ifdef OFXIMGUI_DEBUG
+		else ofLogNotice("EngineGLFW::setup()") << ((void*)this) << " Setting up GLFW in oF window " << ofGetWindowPtr() << " // GlfwWindow=" << ofGetWindowPtr()->getWindowContext() << " ["<< ofGetWindowPtr()->getWindowSize() <<"]";
 
-		ImGuiIO& io = ImGui::GetIO();
+        #if defined(OFXIMGUI_DEBUG) && defined(TARGET_OPENGLES) && defined(TARGET_RASPBERRY_PI)
+            // oF 0.11 related warnings
+            #if defined(TARGET_RASPBERRY_PI_LEGACY)
+                #pragma message "WARNING ! ofxImGui detected that you use the RPI in LEGACY mode, which use an EGL window, which ain't supported by any native imgui backend. Please consider using an ofxImGui version before 1.80."
+            #else
+                #pragma message "You are using the new Rpi GLFW binding. Please ensure that your raspi-config doesn't use the Legacy video drivers for better performance."
+            #endif
 
-		io.KeyMap[ImGuiKey_Tab] = GLFW_KEY_TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = GLFW_KEY_LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = GLFW_KEY_RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = GLFW_KEY_UP;
-		io.KeyMap[ImGuiKey_DownArrow] = GLFW_KEY_DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = GLFW_KEY_PAGE_UP;
-		io.KeyMap[ImGuiKey_PageDown] = GLFW_KEY_PAGE_DOWN;
-		io.KeyMap[ImGuiKey_Home] = GLFW_KEY_HOME;
-		io.KeyMap[ImGuiKey_End] = GLFW_KEY_END;
-		io.KeyMap[ImGuiKey_Insert] = GLFW_KEY_INSERT;
-		io.KeyMap[ImGuiKey_Delete] = GLFW_KEY_DELETE;
-		io.KeyMap[ImGuiKey_Backspace] = GLFW_KEY_BACKSPACE;
-		io.KeyMap[ImGuiKey_Space] = GLFW_KEY_SPACE;
-		io.KeyMap[ImGuiKey_Enter] = GLFW_KEY_ENTER;
-		io.KeyMap[ImGuiKey_Escape] = GLFW_KEY_ESCAPE;
-		io.KeyMap[ImGuiKey_A] = GLFW_KEY_A;
-		io.KeyMap[ImGuiKey_C] = GLFW_KEY_C;
-		io.KeyMap[ImGuiKey_V] = GLFW_KEY_V;
-		io.KeyMap[ImGuiKey_X] = GLFW_KEY_X;
-		io.KeyMap[ImGuiKey_Y] = GLFW_KEY_Y;
-		io.KeyMap[ImGuiKey_Z] = GLFW_KEY_Z;
+            if( !ofIsGLProgrammableRenderer() ){
+                ofLogWarning(__FUNCTION__) << "ofxImGui has not been tested with GL ES 1.0 and there's no official imgui backend for it.";
+            }
+        #endif
+#endif // debug
 
-		if (autoDraw)
-		{
-			if (ofIsGLProgrammableRenderer())
-			{
-				io.RenderDrawListsFn = programmableDrawData;
-			}
-			else
-			{
-				io.RenderDrawListsFn = fixedDrawData;
-			}
+		// Store a reference to the current imgui context for event handling
+		imguiContext = _imguiContext;
+
+        // Init window
+		ofAppBaseWindow* curOfWin = _window;
+        GLFWwindow* curWin = (GLFWwindow*)curOfWin->getWindowContext();
+
+		// Check if the undelying window is valid too
+		if(curWin == nullptr){
+			ofLogError("EngineGLFW::setup()") << "Sorry, for now ofxImGui needs to be setup in a valid window object.";
+			return;
 		}
 
-		io.SetClipboardTextFn = &BaseEngine::setClipboardString;
-		io.GetClipboardTextFn = &BaseEngine::getClipboardString;
+		// Maybe we need this in the future ?
+		// For now OF ensures it's already the active window so it's useless.
+        //glfwMakeContextCurrent(curWin);
 
-		createDeviceObjects();
+        // Todo: check return value from glfw ?
+		// no more auto binding as it's required to set the right imgui context before calling the backend ones. See https://github.com/ocornut/imgui/blob/9764adc7bb7a582601dd4dd1c34d4fa17ab5c8e8/backends/imgui_impl_glfw.cpp#L142-L145
+#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1 && OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 0
+		ImGui_ImplGlfw_InitForOpenGL( curWin, true );
+#else
+		ImGui_ImplGlfw_InitForOpenGL( curWin, false );
+#endif
+		//ImGui_ImplGlfw_InitForOpenGL( curWin, !(OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1 && OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1) );
 
-		// Override listeners
-		ofAddListener(ofEvents().mousePressed, this, &EngineGLFW::onMousePressed);
-		ofAddListener(ofEvents().mouseReleased, this, &EngineGLFW::onMouseReleased);
-		ofAddListener(ofEvents().keyReleased, this, &EngineGLFW::onKeyReleased);
-		ofAddListener(ofEvents().keyPressed, this, &EngineGLFW::onKeyPressed);
+		// Register events manually if needed
+		registerCallbacks(curOfWin, curWin);
 
-		// BaseEngine listeners
-		ofAddListener(ofEvents().mouseDragged, (BaseEngine*)this, &BaseEngine::onMouseDragged);
-		ofAddListener(ofEvents().mouseScrolled, (BaseEngine*)this, &BaseEngine::onMouseScrolled);
-		ofAddListener(ofEvents().windowResized, (BaseEngine*)this, &BaseEngine::onWindowResized);
+        // Init renderer
+        if( ofIsGLProgrammableRenderer() ){
+			const char* glsl_version = getGLVersionFromOF();
+
+#ifdef OFXIMGUI_DEBUG
+            int major = ofGetGLRenderer()->getGLVersionMajor();
+            int minor = ofGetGLRenderer()->getGLVersionMinor();
+    #ifdef TARGET_OPENGLES
+			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with programmable OpenGL ES " << major << "." << minor << " and version string «" << glsl_version << "»";
+    #else
+			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with programmable OpenGL " << major << "." << minor << " and version string «" << glsl_version << "»";
+    #endif
+#endif
+
+            ImGui_ImplOpenGL3_Init(glsl_version); // Called by the function below, but needed with these arguments
+			ImGui_ImplOpenGL3_CreateDeviceObjects();
+        }
+        else
+        {
+#ifdef OFXIMGUI_DEBUG
+    #ifdef TARGET_OPENGLES
+			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with OpenGL ES 1, which is quite experimental. [ofIsGLProgrammableRenderer()=" << (ofIsGLProgrammableRenderer()?"1":"0") << "]";
+    #else
+			ofLogVerbose("EngineGLFW::setup()") << "ofxImGui loading GLFW with OpenGL2 and ofIsGLProgrammableRenderer()=" << (ofIsGLProgrammableRenderer()?"1":"0");
+    #endif
+#endif
+			#if !defined(TARGET_OPENGLES)
+            ImGui_ImplOpenGL2_Init();
+            ImGui_ImplOpenGL2_CreateDeviceObjects();
+			#endif
+        }
 
 		isSetup = true;
-	}
 
-    
+	} 
     
 	//--------------------------------------------------------------
 	void EngineGLFW::exit()
 	{
 		if (!isSetup) return;
-        
-        // Override listeners
-        ofRemoveListener(ofEvents().mousePressed, this, &EngineGLFW::onMousePressed);
-        ofRemoveListener(ofEvents().mouseReleased, this, &EngineGLFW::onMouseReleased);
-        ofRemoveListener(ofEvents().keyReleased, this, &EngineGLFW::onKeyReleased);
-        ofRemoveListener(ofEvents().keyPressed, this, &EngineGLFW::onKeyPressed);
-        
-        // Base class listeners
-        ofRemoveListener(ofEvents().mouseDragged, (BaseEngine*)this, &BaseEngine::onMouseDragged);
-        ofRemoveListener(ofEvents().mouseScrolled, (BaseEngine*)this, &BaseEngine::onMouseScrolled);
-        ofRemoveListener(ofEvents().windowResized, (BaseEngine*)this, &BaseEngine::onWindowResized);
-        
-		invalidateDeviceObjects();
+
+		// Ensure context is set, when shutting down from a callback for example.
+		if(!setImGuiContext()){
+#ifdef OFXIMGUI_DEBUG
+			ofLogWarning("EngineGLFW::exit()") << "Couldn't set context on exit... there's probably something wrong. There's unexpected behaviour ahead, good luck !";
+#endif
+			return;
+		}
+
+//#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
+//		ofRemoveListener(ofGetCurrentWindow()->events().exit, this, &EngineGLFW::onWindowExit);
+//#endif
+		unregisterCallbacks();
+
+        if (ofIsGLProgrammableRenderer()){
+            //ImGui_ImplOpenGL3_DestroyFontsTexture(); // called by function below
+            //ImGui_ImplOpenGL3_DestroyDeviceObjects(); // Called below
+            ImGui_ImplOpenGL3_Shutdown(); // called by ImGuiDestroyContext() later ?
+        }
+        else {
+			#if !defined(TARGET_OPENGLES)
+            //ImGui_ImplOpenGL2_DestroyFontsTexture(); // called by function below
+            //ImGui_ImplOpenGL2_DestroyDeviceObjects(); // Called below
+            ImGui_ImplOpenGL2_Shutdown();
+			#endif
+        }
+		// Note: Restores OF callbacks; can it happen that of unregistered them already ?
+		ImGui_ImplGlfw_Shutdown();
 
 		isSetup = false;
 	}
 
-	//--------------------------------------------------------------
-	void EngineGLFW::draw()
-	{
-		if (ofIsGLProgrammableRenderer())
-		{
-			programmableDrawData(ImGui::GetDrawData());
-		}
-		else
-		{
-			fixedDrawData(ImGui::GetDrawData());
-		}
-	}
+    //--------------------------------------------------------------
+    void EngineGLFW::newFrame()
+    {
+        // Set window ref for later usage
+        //ImGuiIO& io = ImGui::GetIO();
+        //io.BackendPlatformUserData = (void*) (GLFWwindow*) ofGetWindowPtr()->getWindowContext();
+        if (ofIsGLProgrammableRenderer()){
+            ImGui_ImplOpenGL3_NewFrame();
+        }
+        else{
+			#if !defined(TARGET_OPENGLES)
+            ImGui_ImplOpenGL2_NewFrame();
+			#endif
+        }
+        ImGui_ImplGlfw_NewFrame();
+    }
+
 
 	//--------------------------------------------------------------
-	void remapToGLFWConvention(int& button)
+    void EngineGLFW::render()
 	{
-		switch (button)
-		{
 
-		case 0:
-		{
-			break;
-		}
-		case 1:
-		{
-			button = 2;
-			break;
-		}
-		case 2:
-		{
-			button = 1;
-			break;
-		}
-		}
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::onMousePressed(ofMouseEventArgs& event)
-	{
-		int button = event.button;
-		if (button >= 0 && button < 5)
-		{
-			remapToGLFWConvention(button);
-			mousePressed[button] = true;
-		}
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::onMouseReleased(ofMouseEventArgs& event)
-	{
-		int button = event.button;
-		if (button >= 0 && button < 5)
-		{
-			remapToGLFWConvention(button);
-			mousePressed[button] = false;
-		}
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::programmableDrawData(ImDrawData * draw_data)
-	{
-		// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
-		ImGuiIO& io = ImGui::GetIO();
-		int fb_width = (int)(io.DisplaySize.x * io.DisplayFramebufferScale.x);
-		int fb_height = (int)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
-		if (fb_width == 0 || fb_height == 0)
-			return;
-		draw_data->ScaleClipRects(io.DisplayFramebufferScale);
-
-		// Backup GL state
-		GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
-		glActiveTexture(GL_TEXTURE0);
-		GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
-		GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-		GLint last_sampler; glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
-		GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-		GLint last_element_array_buffer; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last_element_array_buffer);
-		GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-		GLint last_polygon_mode[2]; glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
-		GLint last_viewport[4]; glGetIntegerv(GL_VIEWPORT, last_viewport);
-		GLint last_scissor_box[4]; glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
-		GLenum last_blend_src_rgb; glGetIntegerv(GL_BLEND_SRC_RGB, (GLint*)&last_blend_src_rgb);
-		GLenum last_blend_dst_rgb; glGetIntegerv(GL_BLEND_DST_RGB, (GLint*)&last_blend_dst_rgb);
-		GLenum last_blend_src_alpha; glGetIntegerv(GL_BLEND_SRC_ALPHA, (GLint*)&last_blend_src_alpha);
-		GLenum last_blend_dst_alpha; glGetIntegerv(GL_BLEND_DST_ALPHA, (GLint*)&last_blend_dst_alpha);
-		GLenum last_blend_equation_rgb; glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint*)&last_blend_equation_rgb);
-		GLenum last_blend_equation_alpha; glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint*)&last_blend_equation_alpha);
-		GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
-		GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
-		GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
-		GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-
-		// Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
-		glEnable(GL_BLEND);
-		glBlendEquation(GL_FUNC_ADD);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDisable(GL_CULL_FACE);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_SCISSOR_TEST);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-		// Setup viewport, orthographic projection matrix
-		glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height);
-		const float ortho_projection[4][4] =
-		{
-			{ 2.0f/io.DisplaySize.x, 0.0f,                   0.0f, 0.0f },
-			{ 0.0f,                  2.0f/-io.DisplaySize.y, 0.0f, 0.0f },
-			{ 0.0f,                  0.0f,                  -1.0f, 0.0f },
-			{-1.0f,                  1.0f,                   0.0f, 1.0f },
-		};
-		glUseProgram(g_ShaderHandle);
-		glUniform1i(g_UniformLocationTex, 0);
-		glUniformMatrix4fv(g_UniformLocationProjMtx, 1, GL_FALSE, &ortho_projection[0][0]);
-		glBindVertexArray(g_VaoHandle);
-		glBindSampler(0, 0); // Rely on combined texture/sampler state.
-
-		for (int n = 0; n < draw_data->CmdListsCount; n++)
-		{
-			const ImDrawList* cmd_list = draw_data->CmdLists[n];
-			const ImDrawIdx* idx_buffer_offset = 0;
-
-			glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
-			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), (const GLvoid*)cmd_list->VtxBuffer.Data, GL_STREAM_DRAW);
-
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_ElementsHandle);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx), (const GLvoid*)cmd_list->IdxBuffer.Data, GL_STREAM_DRAW);
-
-			for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
-			{
-				const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-				if (pcmd->UserCallback)
-				{
-					pcmd->UserCallback(cmd_list, pcmd);
-				}
-				else
-				{
-					glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
-					glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
-					glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, idx_buffer_offset);
-				}
-				idx_buffer_offset += pcmd->ElemCount;
-			}
-		}
-
-		// Restore modified GL state
-		glUseProgram(last_program);
-		glBindTexture(GL_TEXTURE_2D, last_texture);
-		glBindSampler(0, last_sampler);
-		glActiveTexture(last_active_texture);
-		glBindVertexArray(last_vertex_array);
-		glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
-		glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-		glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-		if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-		if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-		if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-		if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-		glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
-		glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-		glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::fixedDrawData(ImDrawData * draw_data)
-	{
-		// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
-		ImGuiIO& io = ImGui::GetIO();
-		int fb_width = (int)(io.DisplaySize.x * io.DisplayFramebufferScale.x);
-		int fb_height = (int)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
-		if (fb_width == 0 || fb_height == 0)
-			return;
-		draw_data->ScaleClipRects(io.DisplayFramebufferScale);
-
-		// We are using the OpenGL fixed pipeline to make the example code simpler to read!
-		// Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, vertex/texcoord/color pointers, polygon fill.
-		GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-		GLint last_polygon_mode[2]; glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
-		GLint last_viewport[4]; glGetIntegerv(GL_VIEWPORT, last_viewport);
-		GLint last_scissor_box[4]; glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
-		glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDisable(GL_CULL_FACE);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_SCISSOR_TEST);
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glEnableClientState(GL_COLOR_ARRAY);
-		glEnable(GL_TEXTURE_2D);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//glUseProgram(0); // You may want this if using this code in an OpenGL 3+ context where shaders may be bound
-
-		// Setup viewport, orthographic projection matrix
-		glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height);
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		glLoadIdentity();
-		glOrtho(0.0f, io.DisplaySize.x, io.DisplaySize.y, 0.0f, -1.0f, +1.0f);
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		glLoadIdentity();
-
-		// Render command lists
-		for (int n = 0; n < draw_data->CmdListsCount; n++)
-		{
-			const ImDrawList* cmd_list = draw_data->CmdLists[n];
-			const ImDrawVert* vtx_buffer = cmd_list->VtxBuffer.Data;
-			const ImDrawIdx* idx_buffer = cmd_list->IdxBuffer.Data;
-			glVertexPointer(2, GL_FLOAT, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, pos)));
-			glTexCoordPointer(2, GL_FLOAT, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, uv)));
-			glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, col)));
-
-			for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
-			{
-				const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-				if (pcmd->UserCallback)
-				{
-					pcmd->UserCallback(cmd_list, pcmd);
-				}
-				else
-				{
-					glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
-					glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
-					glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, idx_buffer);
-				}
-				idx_buffer += pcmd->ElemCount;
-			}
-		}
-
-		// Restore modified state
-		glDisableClientState(GL_COLOR_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture);
-		glMatrixMode(GL_MODELVIEW);
-		glPopMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glPopAttrib();
-		glPolygonMode(GL_FRONT, last_polygon_mode[0]); glPolygonMode(GL_BACK, last_polygon_mode[1]);
-		glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-		glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::onKeyReleased(ofKeyEventArgs& event)
-	{
-		int key = event.keycode;
-		ImGuiIO& io = ImGui::GetIO();
-		io.KeysDown[key] = false;
-
-		io.KeyCtrl = io.KeysDown[GLFW_KEY_LEFT_CONTROL] || io.KeysDown[GLFW_KEY_RIGHT_CONTROL];
-		io.KeyShift = io.KeysDown[GLFW_KEY_LEFT_SHIFT] || io.KeysDown[GLFW_KEY_RIGHT_SHIFT];
-		io.KeyAlt = io.KeysDown[GLFW_KEY_LEFT_ALT] || io.KeysDown[GLFW_KEY_RIGHT_ALT];
-		io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER] || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
-	}
-
-	//--------------------------------------------------------------
-	void EngineGLFW::onKeyPressed(ofKeyEventArgs& event)
-	{
-		int key = event.keycode;
-		ImGuiIO& io = ImGui::GetIO();
-		io.KeysDown[key] = true;
-
-		io.KeyCtrl = io.KeysDown[GLFW_KEY_LEFT_CONTROL] || io.KeysDown[GLFW_KEY_RIGHT_CONTROL];
-		io.KeyShift = io.KeysDown[GLFW_KEY_LEFT_SHIFT] || io.KeysDown[GLFW_KEY_RIGHT_SHIFT];
-		io.KeyAlt = io.KeysDown[GLFW_KEY_LEFT_ALT] || io.KeysDown[GLFW_KEY_RIGHT_ALT];
-		io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER] || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
-
-		bool isNumericalKey = (key >= GLFW_KEY_KP_0) && (key <= GLFW_KEY_KP_EQUAL);
-		if (key < GLFW_KEY_ESCAPE || isNumericalKey)
-		{
-			io.AddInputCharacter((unsigned short)event.codepoint);
-		}
-	}
-
-	//--------------------------------------------------------------
-	bool EngineGLFW::createDeviceObjects()
-	{
-		if (ofIsGLProgrammableRenderer())
-		{
-			// Backup GL state
-			GLint last_texture, last_array_buffer, last_vertex_array;
-			glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-			glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-			glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-
-			const GLchar *vertex_shader =
-			"#version 150\n"
-			"uniform mat4 ProjMtx;\n"
-			"in vec2 Position;\n"
-			"in vec2 UV;\n"
-			"in vec4 Color;\n"
-			"out vec2 Frag_UV;\n"
-			"out vec4 Frag_Color;\n"
-			"void main()\n"
-			"{\n"
-			"	Frag_UV = UV;\n"
-			"	Frag_Color = Color;\n"
-			"	gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
-			"}\n";
-
-			const GLchar* fragment_shader =
-			"#version 150\n"
-			"uniform sampler2D Texture;\n"
-			"in vec2 Frag_UV;\n"
-			"in vec4 Frag_Color;\n"
-			"out vec4 Out_Color;\n"
-			"void main()\n"
-			"{\n"
-			"	Out_Color = Frag_Color * texture( Texture, Frag_UV.st);\n"
-			"}\n";
-
-			g_ShaderHandle = glCreateProgram();
-			g_VertHandle = glCreateShader(GL_VERTEX_SHADER);
-			g_FragHandle = glCreateShader(GL_FRAGMENT_SHADER);
-			glShaderSource(g_VertHandle, 1, &vertex_shader, 0);
-			glShaderSource(g_FragHandle, 1, &fragment_shader, 0);
-			glCompileShader(g_VertHandle);
-			glCompileShader(g_FragHandle);
-			glAttachShader(g_ShaderHandle, g_VertHandle);
-			glAttachShader(g_ShaderHandle, g_FragHandle);
-			glLinkProgram(g_ShaderHandle);
-
-			g_UniformLocationTex = glGetUniformLocation(g_ShaderHandle, "Texture");
-			g_UniformLocationProjMtx = glGetUniformLocation(g_ShaderHandle, "ProjMtx");
-			g_AttribLocationPosition = glGetAttribLocation(g_ShaderHandle, "Position");
-			g_AttribLocationUV = glGetAttribLocation(g_ShaderHandle, "UV");
-			g_AttribLocationColor = glGetAttribLocation(g_ShaderHandle, "Color");
-
-			glGenBuffers(1, &g_VboHandle);
-			glGenBuffers(1, &g_ElementsHandle);
-
-			glGenVertexArrays(1, &g_VaoHandle);
-			glBindVertexArray(g_VaoHandle);
-			glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
-			glEnableVertexAttribArray(g_AttribLocationPosition);
-			glEnableVertexAttribArray(g_AttribLocationUV);
-			glEnableVertexAttribArray(g_AttribLocationColor);
-
-			glVertexAttribPointer(g_AttribLocationPosition, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, pos));
-			glVertexAttribPointer(g_AttribLocationUV, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, uv));
-			glVertexAttribPointer(g_AttribLocationColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, col));
-
-			createFontsTexture();
-
-			// Restore modified GL state
-			glBindTexture(GL_TEXTURE_2D, last_texture);
-			glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-			glBindVertexArray(last_vertex_array);
-
-			return true;
-		}
-		else
-		{
-			createFontsTexture();
-
-			return true;
-		}
-	}
-
-	//--------------------------------------------------------------
-	bool EngineGLFW::createFontsTexture()
-	{
-		// Build texture atlas
-		ImGuiIO& io = ImGui::GetIO();
-		unsigned char* pixels;
-		int width, height;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
-		
-		// Upload texture to graphics system
-		GLint last_texture;
-		glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-		glGenTextures(1, &g_FontTexture);
-		glBindTexture(GL_TEXTURE_2D, g_FontTexture);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Ensure GL is in a compatible state
+#if IMGUI_VERSION_NUM <= 19210 && IMGUI_VERSION_NUM >= 19200
+		// Note: required for ofApps that use ofTexture which can set/leave this to a different value.
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-		
-		// Store our identifier
-		io.Fonts->TexID = (void *)(intptr_t)g_FontTexture;
-		
-		// Restore state
-		glBindTexture(GL_TEXTURE_2D, last_texture);
-		
-		return true;
+		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+#endif
+
+        if (ofIsGLProgrammableRenderer()) {
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
+        else {
+			#if !defined(TARGET_OPENGLES)
+            // GLint last_program;
+            // glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
+            // glUseProgram(0);
+            //There are potentially many more states you could need to clear/setup that we can't access from default headers.
+            //e.g. glBindBuffer(GL_ARRAY_BUFFER, 0), glDisable(GL_TEXTURE_CUBE_MAP).
+            ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+            //glUseProgram(last_program);
+			#endif
+        }
+        updatePlatformWindows();
+    }
+
+    //--------------------------------------------------------------
+    void EngineGLFW::updatePlatformWindows(){
+        // Handle multi-viewports
+        ImGuiIO& io = ImGui::GetIO();
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable){
+            GLFWwindow* backup_current_context = glfwGetCurrentContext(); // Tocheck, maybe not possible on rpi ?
+
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+
+            // Restore context so we can continue to render with oF
+            glfwMakeContextCurrent(backup_current_context);
+        }
 	}
 
 	//--------------------------------------------------------------
-	void EngineGLFW::invalidateDeviceObjects()
-	{
-		if (ofIsGLProgrammableRenderer())
-		{
-			if (g_VaoHandle) glDeleteVertexArrays(1, &g_VaoHandle);
-			if (g_VboHandle) glDeleteBuffers(1, &g_VboHandle);
-			if (g_ElementsHandle) glDeleteBuffers(1, &g_ElementsHandle);
-			g_VaoHandle = g_VboHandle = g_ElementsHandle = 0;
+    bool EngineGLFW::updateFontsTexture(){
+#if IMGUI_VERSION_NUM < 19200
+        if (ofIsGLProgrammableRenderer()) {
+            return ImGui_ImplOpenGL3_CreateFontsTexture();
+        }
+        else {
+            return ImGui_ImplOpenGL2_CreateFontsTexture();
+        }
+#else
+        return true;
+#endif
+    }
 
-			if (g_ShaderHandle && g_VertHandle) glDetachShader(g_ShaderHandle, g_VertHandle);
-			if (g_VertHandle) glDeleteShader(g_VertHandle);
-			g_VertHandle = 0;
+	//--------------------------------------------------------------
+	void EngineGLFW::registerCallbacks(ofAppBaseWindow* ofWindowPtr, GLFWwindow* glfwWindowPtr){
+#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1
+	#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
+		// Use GLFW window user pointer API to retrieve an instance, events are static/non-member
+		// Error: OF needs the userpointer, or we'd have to set it back, too messy.
+		//glfwSetWindowUserPointer(curWin, (void*)this);
 
-			if (g_ShaderHandle && g_FragHandle) glDetachShader(g_ShaderHandle, g_FragHandle);
-			if (g_FragHandle) glDeleteShader(g_FragHandle);
-			g_FragHandle = 0;
+		// Replace callbacks and store original callbacks
+		// Note: the set functions return the previously installe callbacks or nullptr if none.
+		originalOFCallbacks = {
+			glfwSetWindowFocusCallback( glfwWindowPtr, GlfwWindowFocusCallbackGlobal),
+			glfwSetCursorEnterCallback( glfwWindowPtr, GlfwCursorEnterCallbackGlobal),
+			glfwSetCursorPosCallback(   glfwWindowPtr, GlfwCursorPosCallbackGlobal),
+			glfwSetMouseButtonCallback( glfwWindowPtr, GlfwMouseButtonCallbackGlobal),
+			glfwSetScrollCallback(      glfwWindowPtr, GlfwScrollCallbackGlobal),
+			glfwSetKeyCallback(         glfwWindowPtr, GlfwKeyCallbackGlobal),
+			glfwSetCharCallback(        glfwWindowPtr, GlfwCharCallbackGlobal),
+			glfwSetMonitorCallback(                    GlfwMonitorCallbackGlobal),
+			true
+		};
 
-			if (g_ShaderHandle) glDeleteProgram(g_ShaderHandle);
-			g_ShaderHandle = 0;
+		// Unnecessary (only needed for popped-out windows, when viewports are enabled ?)
+		//glfwSetWindowPosCallback(   curWin, ImGui_ImplGlfw_WindowPosCallback);
+		//glfwSetWindowSizeCallback(  curWin, ImGui_ImplGlfw_WindowSizeCallback);
+
+		// Register context
+		enginesMap.add(glfwWindowPtr, this);
+
+		// Listen to window destruction.
+		// fixme: should always register (any backend) ?
+		ofAddListener(ofWindowPtr->events().exit, this, &EngineGLFW::onWindowExit);
+
+		// This might give better performance if enabled. To be fully tested.
+		//ImGui_ImplGlfw_SetCallbacksChainForAllWindows(true);
+
+		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the ofxImGui ones which will then call the OF and ImGui ones while adding multi-context support.";
+	#else
+		ofLogNotice("EngineGLFW::setup()") << "Replaced the openFrameworks' GLFW event listeners by the imgui_impl_glfw ones. You will not have multi-window nor multi-context support. This can be enabled by defining OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP=1.";
+		#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
+		// Register window at 2ndary
+		mainGLFWWindow = glfwWindowPtr;
+		ImGui_ImplGlfw_ScopedContext::RegisterWindowContext(glfwWindowPtr, this->imguiContext);
+		#endif
+	#endif
+		// - - - - - - - - - - -
+		// Bind to openframeworks
+		// - - - - - - - - - - -
+#else
+		// Mouse events
+		ofAddListener(ofEvents().mouseMoved,    this, &EngineGLFW::onMouseMoved   );
+		ofAddListener(ofEvents().mouseDragged,  this, &EngineGLFW::onMouseDragged );
+		ofAddListener(ofEvents().mousePressed,  this, &EngineGLFW::onMouseButton  );
+		ofAddListener(ofEvents().mouseReleased, this, &EngineGLFW::onMouseButton  );
+		ofAddListener(ofEvents().mouseScrolled, this, &EngineGLFW::onMouseScrolled);
+
+	#ifdef OFXIMGUI_TOUCH_EVENTS
+		// TouchEvents
+		ofAddListener(ofEvents().touchDoubleTap,this, &EngineGLFW::onTouchInput );
+		ofAddListener(ofEvents().touchMoved,    this, &EngineGLFW::onTouchInput );
+		ofAddListener(ofEvents().touchDown,     this, &EngineGLFW::onTouchInput );
+		ofAddListener(ofEvents().touchUp,       this, &EngineGLFW::onTouchInput );
+		ofAddListener(ofEvents().touchCancelled, this, &EngineGLFW::onTouchInput);
+	#endif
+		// Keyboard avents
+		ofAddListener(ofEvents().keyReleased,   this, &EngineGLFW::onKeyEvent );
+		ofAddListener(ofEvents().keyPressed,    this, &EngineGLFW::onKeyEvent );
+		ofAddListener(ofEvents().charEvent,     this, &EngineGLFW::onCharInput);
+
+		// Window Listeners
+		//ofAddListener(ofEvents().windowResized, this, &EngineGLFW::onWindowResized);
+
+	#ifdef OFXIMGUI_TOUCH_EVENTS
+		// TouchEvents
+		//ofAddListener(ofEvents().touchDoubleTap,this, &EngineGLFW::onDeviceOrientationChanged);
+	#endif
+		// Additional mouse data
+		ofAddListener(ofEvents().mouseEntered, this, &EngineGLFW::onMouseMoved);
+		ofAddListener(ofEvents().mouseExited , this, &EngineGLFW::onMouseMoved);
+
+		// ImGui also has io.AddFocusEvent but OF hasn't got them.
+#endif
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::unregisterCallbacks(){
+#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1
+		// - - - - - - - - - - -
+		// Bind to GLFW
+		// - - - - - - - - - - -
+	#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
+		GLFWwindow* glfwWindowPtr = (GLFWwindow*)ofGetWindowPtr()->getWindowContext();
+		// Restore OF callbacks
+		// Fixme: when OF is exiting, Not sure this is a good idea.
+		if(originalOFCallbacks.isValid){
+			glfwSetWindowFocusCallback( glfwWindowPtr, originalOFCallbacks.originalCallbackWindowFocus);
+			glfwSetCursorEnterCallback( glfwWindowPtr, originalOFCallbacks.originalCallbackCursorEnter);
+			glfwSetCursorPosCallback(   glfwWindowPtr, originalOFCallbacks.originalCallbackCursorPos);
+			glfwSetMouseButtonCallback( glfwWindowPtr, originalOFCallbacks.originalCallbackMousebutton);
+			glfwSetScrollCallback(      glfwWindowPtr, originalOFCallbacks.originalCallbackScroll);
+			glfwSetKeyCallback(         glfwWindowPtr, originalOFCallbacks.originalCallbackKey);
+			glfwSetCharCallback(        glfwWindowPtr, originalOFCallbacks.originalCallbackChar);
+			glfwSetMonitorCallback(                    originalOFCallbacks.originalCallbackMonitor);
+			originalOFCallbacks.isValid = false;
 		}
+		ofRemoveListener(ofGetWindowPtr()->events().exit, this, &EngineGLFW::onWindowExit);
+		enginesMap.remove(glfwWindowPtr);
+	#else
+		#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_SECONDARY_VP == 1
+		// Unregister window at 2ndary
+		if(mainGLFWWindow != nullptr){
+			ImGui_ImplGlfw_ScopedContext::RemoveWindowContext(mainGLFWWindow);
+			mainGLFWWindow = nullptr;
+		}
+		#endif
+	#endif
+		// - - - - - - - - - - -
+		// Bind to openframeworks
+		// - - - - - - - - - - -
+#else
+		// Mouse events
+		ofRemoveListener(ofEvents().mouseMoved,     this, &EngineGLFW::onMouseMoved   );
+		ofRemoveListener(ofEvents().mouseDragged,   this, &EngineGLFW::onMouseDragged );
+		ofRemoveListener(ofEvents().mousePressed,   this, &EngineGLFW::onMouseButton  );
+		ofRemoveListener(ofEvents().mouseReleased,  this, &EngineGLFW::onMouseButton  );
+		ofRemoveListener(ofEvents().mouseScrolled,  this, &EngineGLFW::onMouseScrolled);
 
-		if (g_FontTexture)
-		{
-			glDeleteTextures(1, &g_FontTexture);
-            //JVC: This is causing an error
-			ImGui::GetIO().Fonts->TexID = 0;
-			g_FontTexture = 0;
+	#ifdef OFXIMGUI_TOUCH_EVENTS
+		// TouchEvents
+		ofRemoveListener(ofEvents().touchDoubleTap, this, &EngineGLFW::onTouchInput );
+		ofRemoveListener(ofEvents().touchMoved,     this, &EngineGLFW::onTouchInput );
+		ofRemoveListener(ofEvents().touchDown,      this, &EngineGLFW::onTouchInput );
+		ofRemoveListener(ofEvents().touchUp,        this, &EngineGLFW::onTouchInput );
+		ofRemoveListener(ofEvents().touchCancelled, this, &EngineGLFW::onTouchInput );
+	#endif
+
+		// Keyboard avents
+		ofRemoveListener(ofEvents().keyPressed,     this, &EngineGLFW::onKeyEvent );
+		ofRemoveListener(ofEvents().keyPressed,     this, &EngineGLFW::onKeyEvent );
+		ofRemoveListener(ofEvents().charEvent,      this, &EngineGLFW::onCharInput);
+
+		// Window Listeners
+		//ofRemoveListener(ofEvents().windowResized,  this, &EngineGLFW::onWindowResized);
+
+		// Additional mouse data
+		ofRemoveListener(ofEvents().mouseEntered, this, &EngineGLFW::onMouseMoved);
+		ofRemoveListener(ofEvents().mouseExited , this, &EngineGLFW::onMouseMoved);
+#endif
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::onWindowExit(ofEventArgs& event){
+		// Todo: Clean this up and check correct behaviour
+		std::cout << "Window Exit! [engine]" << (void*)this << " // [window]" << ofGetWindowPtr() << std::endl;
+		std::cout << "ofApp = " << (void*)ofGetAppPtr() << " // [window]" << ofGetAppPtr() << std::endl;
+
+		// Set imgui context of this window
+		if(!setImGuiContext()) return;
+
+		// Call Destroy platform windows(otherwise pop-out windows remain visible but unresponsive)
+		//ImGui_ImplGlfw_Shutdown();
+		//ImGui_ImplGlfw_ShutdownPlatformInterface();
+
+		// Todo: Notify global GLFW event listeners to not forward calls anymore ? Windows platforms seem to receuve a focus callback afterwards
+
+		// When using quit, exit() makes pollEvents crash later. Try to call it before.
+		//ofGetMainLoop()->pollEvents();
+
+		// Dummy exit ? What if context is shared ?
+		//exit();
+#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
+		enginesMap.remove((GLFWwindow*)ofGetWindowPtr()->getWindowContext());
+#endif
+
+
+		// Set unloaded state
+		imguiContext = nullptr;
+		isSetup = false;
+
+		// Todo: notify child/slaves about gui destruction ? gui.begin() should return false if the gui has gone ?
+		std::cout << "Exit done" << std::endl;
+	}
+
+//	//--------------------------------------------------------------
+//	// Clipboard functions
+//	static const char* ImGui_ImplGlfw_GetClipboardText(void* user_data)
+//	{
+//		// Set context
+//		//if(!setImGuiContext()) return;
+
+//		return glfwGetClipboardString((GLFWwindow*)user_data);
+//	}
+
+//	//--------------------------------------------------------------
+//	static void ImGui_ImplGlfw_SetClipboardText(void* user_data, const char* text)
+//	{
+//		// Set context
+//		//if(!setImGuiContext()) return;
+//		glfwSetClipboardString((GLFWwindow*)user_data, text);
+//	}
+
+// Bind to GLFW ?
+#if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 1
+#if OFXIMGUI_GLFW_FIX_MULTICONTEXT_PRIMARY_VP == 1
+	//--------------------------------------------------------------
+    // The code below is a template from the GLFW backend, almost unmodified, but commented.
+    void EngineGLFW::GlfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods){
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackMousebutton) originalOFCallbacks.originalCallbackMousebutton(window, button, action, mods);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+        // Call backend function
+        ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+
+		// Warning: gotta call newFrame() to compute the active state (1 frame delay?)
+		if(!ImGui::GetIO().WantCaptureMouse){
+			// todo: call openframeworks callback
+        }
+
+        // Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwMouseButtonCallbackGlobal(GLFWwindow* window, int button, int action, int mods){
+		//EngineGLFW* self = static_cast<EngineGLFW*>(glfwGetWindowUserPointer(window));
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwMouseButtonCallback(window, button, action, mods);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogNotice("EngineGLFW::GlfwMouseButtonCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+    void EngineGLFW::GlfwScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackScroll) originalOFCallbacks.originalCallbackScroll(window, xoffset, yoffset);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwScrollCallbackGlobal(GLFWwindow* window, double xoffset, double yoffset) {
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwScrollCallback(window, xoffset, yoffset);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogNotice("EngineGLFW::GlfwScrollCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+    void EngineGLFW::GlfwKeyCallback(GLFWwindow* window, int keycode, int scancode, int action, int mods){
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackKey) originalOFCallbacks.originalCallbackKey(window, keycode, scancode, action, mods);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_KeyCallback(window, keycode, scancode, action, mods);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwKeyCallbackGlobal(GLFWwindow* window, int keycode, int scancode, int action, int mods){
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwKeyCallback(window, keycode, scancode, action, mods);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogNotice("EngineGLFW::GlfwKeyCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+    void EngineGLFW::GlfwWindowFocusCallback(GLFWwindow* window, int focused) {
+//		if(ofGetMainLoop()->exitEvent)
+//			if(ofGetMainLoop()->getCurrentWindow()->events().notifyExit() != nullptr)
+
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackWindowFocus) originalOFCallbacks.originalCallbackWindowFocus(window, focused);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwWindowFocusCallbackGlobal(GLFWwindow* window, int focused) {
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwWindowFocusCallback(window, focused);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogWarning("EngineGLFW::GlfwWindowFocusCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwCursorPosCallback(GLFWwindow* window, double x, double y) {
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackCursorPos) originalOFCallbacks.originalCallbackCursorPos(window, x, y);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_CursorPosCallback(window, x, y);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwCursorPosCallbackGlobal(GLFWwindow* window, double x, double y) {
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwCursorPosCallback(window, x, y);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogWarning("EngineGLFW::GlfwCursorPosCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+    // Workaround: X11 seems to send spurious Leave/Enter events which would make us lose our position,
+    // so we back it up and restore on Leave/Enter (see https://github.com/ocornut/imgui/issues/4984)
+    void EngineGLFW::GlfwCursorEnterCallback(GLFWwindow* window, int entered) {
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackCursorEnter) originalOFCallbacks.originalCallbackCursorEnter(window, entered);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_CursorEnterCallback(window, entered);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwCursorEnterCallbackGlobal(GLFWwindow* window, int entered) {
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwCursorEnterCallback(window, entered);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogWarning("EngineGLFW::GlfwCursorEnterCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwCharCallback(GLFWwindow* window, unsigned int c) {
+
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackChar) originalOFCallbacks.originalCallbackChar(window, c);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_CharCallback(window, c);
+
+		// Restore
+		restoreImGuiContext();
+    }
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwCharCallbackGlobal(GLFWwindow* window, unsigned int c) {
+		EngineGLFW* self = enginesMap.findData(window);
+		if(self) self->GlfwCharCallback(window, c);
+#ifdef OFXIMGUI_DEBUG
+		else ofLogWarning("EngineGLFW::GlfwCharCallbackGlobal") << "Missed a callback due to unknown window = " << window;
+#endif
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwMonitorCallback(GLFWmonitor* mon, int id) {
+		// Call the original callback
+		if(originalOFCallbacks.originalCallbackMonitor) originalOFCallbacks.originalCallbackMonitor(mon, id);
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// Call backend function
+		ImGui_ImplGlfw_MonitorCallback(mon, id);
+
+		// Restore
+		restoreImGuiContext();
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::GlfwMonitorCallbackGlobal(GLFWmonitor* mon, int id) {
+		// To prevent storing an extra monitor map, and because windows can change their monitor, simply trigger all engines to resize.
+		auto item = enginesMap.getFirst();
+#ifdef OFXIMGUI_DEBUG
+		if(!item) ofLogWarning("EngineGLFW::GlfwMonitorCallbackGlobal") << "Missed a callback due to no engines  = " << mon;
+#endif
+		while(item){
+			item->data->GlfwMonitorCallbackGlobal(mon, id);
+			item = item->getNext();
 		}
 	}
-}
+
+	LinkedList<GLFWwindow, EngineGLFW*> EngineGLFW::enginesMap = {};
+
+#endif
+
+ // End bind events to OF
+#else // if OFXIMGUI_GLFW_EVENTS_REPLACE_OF_CALLBACKS == 0
+
+	//--------------------------------------------------------------
+	// Reverse implementation of ofAppGLFWWindow::motion_cb
+	void EngineGLFW::onMouseMoved(ofMouseEventArgs& event)
+	{
+		// Set context
+		if(!setImGuiContext()) return;
+
+		ImGui_ImplGlfw_CursorPosCallback( (GLFWwindow*)ofGetWindowPtr()->getWindowContext(), event.x, event.y );
+
+		restoreImGuiContext();
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::onMouseDragged(ofMouseEventArgs& event)
+	{
+		// Set context
+		if(!setImGuiContext()) return;
+
+		ImGui_ImplGlfw_CursorPosCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), event.x, event.y );
+
+		// Update imgui mouse pos
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.AddMousePosEvent(static_cast<float>(event.x), static_cast<float>(event.y));
+
+		restoreImGuiContext();
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::onMouseScrolled(ofMouseEventArgs& event)
+	{
+		// Set context
+		if(!setImGuiContext()) return;
+
+		ImGui_ImplGlfw_ScrollCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), event.scrollX, event.scrollY );
+		// Update imgui mouse pos
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.AddMouseWheelEvent( static_cast<float>(event.scrollX), static_cast<float>(event.scrollY) );
+
+		restoreImGuiContext();
+	}
+
+	//--------------------------------------------------------------
+	// Reverse implementation of ofAppGLFWWindow::mouse_cb
+	void EngineGLFW::onMouseButton(ofMouseEventArgs& event)
+	{
+		// Set context
+		if(!setImGuiContext()) return;
+
+		if(event.type == ofMouseEventArgs::Entered || event.type == ofMouseEventArgs::Exited){
+			ImGui_ImplGlfw_CursorEnterCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), event.type == ofMouseEventArgs::Entered );
+		}
+		else if(event.type == ofMouseEventArgs::Moved || event.type == ofMouseEventArgs::Dragged){
+			ImGui_ImplGlfw_CursorPosCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), event.x, event.y);
+		}
+		else {
+			int button = GLFW_MOUSE_BUTTON_LEFT;
+			switch(event.button){
+			case OF_MOUSE_BUTTON_LEFT:
+				button = GLFW_MOUSE_BUTTON_LEFT;
+				break;
+			case OF_MOUSE_BUTTON_RIGHT:
+				button = GLFW_MOUSE_BUTTON_RIGHT;
+				break;
+			case OF_MOUSE_BUTTON_MIDDLE:
+				button = GLFW_MOUSE_BUTTON_MIDDLE;
+				break;
+			}
+			int modifiers = 0;
+			if(event.modifiers & OF_KEY_SHIFT){
+				modifiers |= GLFW_MOD_SHIFT;
+			}
+			if(event.modifiers & OF_KEY_ALT){
+				modifiers |= GLFW_MOD_ALT;
+			}
+			if(event.modifiers & OF_KEY_CONTROL){
+				modifiers |= GLFW_MOD_CONTROL;
+			}
+			if(event.modifiers & OF_KEY_SUPER){
+				modifiers |= GLFW_MOD_SUPER;
+			}
+
+			ImGui_ImplGlfw_MouseButtonCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), button, event.type == ofMouseEventArgs::Pressed, modifiers );
+		}
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.AddMouseButtonEvent(event.button, event.type == ofMouseEventArgs::Pressed);
+
+		restoreImGuiContext();
+	}
+	//--------------------------------------------------------------
+	void EngineGLFW::onKeyEvent(ofKeyEventArgs& event)
+	{
+		// Ignore repeats
+		//if(event.isRepeat) return;
+
+		// Set context
+		if(!setImGuiContext()) return;
+
+		// This one is a little too hard to port, let's behave like EngineOpenFrameworks
+		// ImGui_ImplGlfw_KeyCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), ...);
+
+		int key = event.keycode; // Todo: this seems to be window specific ?
+		ImGuiIO& io = ImGui::GetIO();
+
+		// Set key modifiers (ensures they are set on time, fixes kb shortcuts)
+		io.AddKeyEvent(ImGuiMod_Ctrl,  event.hasModifier(OF_KEY_CONTROL));
+		io.AddKeyEvent(ImGuiMod_Shift, event.hasModifier(OF_KEY_SHIFT));
+		io.AddKeyEvent(ImGuiMod_Alt,   event.hasModifier(OF_KEY_ALT));
+		io.AddKeyEvent(ImGuiMod_Super, event.hasModifier(OF_KEY_SUPER));
+
+		// Since 1.87 : Key events
+		ImGuiKey imKey = oFKeyToImGuiKey(event.key);
+		//ImGuiKey imgui_key = ImGui_ImplGlfw_KeyToImGuiKey(keycode); // Previous code
+
+		// Fallback by guessing the imguikey from the typed character
+		// Note: could create weird behaviour on some special keyboards ?
+		// If so: It could be disabled, it doesn't prevent from using ImGui
+		// This helps registering key up/down state, which is rarely used in imgui widgets.
+//		if(imKey == ImGuiKey_None){
+//			// Note: codepoint corresponds to the typed character
+//			imKey = keyCodeToImGuiKey( event.codepoint );
+//		}
+
+		io.AddKeyEvent(imKey, event.type == ofKeyEventArgs::Pressed );
+
+		// Note: this brings support for pre-1.87 user code using very specific API code.
+		// It causes an assert/crash in imgui v1.89.3 when releasing ALT+CMD simultanously (osx+backend_of_native), when IMGUI_DISABLE_OBSOLETE_KEYIO is not defined.
+		// As we disabled it, we can support old user code again.
+		io.SetKeyEventNativeData(imKey, key, event.scancode); // To support legacy indexing (<1.87 user code)
+
+		restoreImGuiContext();
+	}
+
+	//--------------------------------------------------------------
+	void EngineGLFW::onCharInput(uint32_t& _char)
+	{
+		// Set context
+		if(!setImGuiContext()) return;
+
+		ImGui_ImplGlfw_CharCallback((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), _char);
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.AddInputCharacter((unsigned short)_char);
+
+		restoreImGuiContext();
+	}
+	//--------------------------------------------------------------
+//	void EngineGLFW::onWindowResized(ofResizeEventArgs& window)
+//	{
+//		// Set context
+//		if(!setImGuiContext()) return;
+
+//		//ImGuiIO& io = ImGui::GetIO();
+//		//io.DisplaySize = ImVec2((float)window.width, (float)window.height);
+
+//		restoreImGuiContext();
+//	}
+#endif // End bind events to OF
+
+} // End namespace ofxImGui
+
+
+
 
 #endif

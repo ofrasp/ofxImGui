@@ -1,7 +1,9 @@
 #pragma once
 
 #include "ofMain.h"
+
 #include "ofxImGui.h"
+#include "ImHelpers.h"
 
 class ofApp 
 	: public ofBaseApp
@@ -52,7 +54,7 @@ protected:
 
 	// Parameters
 	ofParameter<ofFloatColor> background{ "Background", ofFloatColor::black };
-	ofParameter<ofFloatColor> foreground{ "Foreground", ofFloatColor::crimson };
+	ofParameter<ofColor> foreground{ "Foreground", ofColor::crimson };
 	ofParameterGroup colors{ "Colors", background, foreground };
 
 	ofParameter<bool> enabled{ "Enabled", true };
@@ -66,4 +68,6 @@ protected:
 	ofParameter<bool> preview{ "Preview", false };
 	ofParameter<string> imagePath{ "Image Path", "texture.jpg" };
 	ofParameterGroup render{ "Render", fillMode, strokeMode, preview, imagePath };
+
+	ofFbo fbo;
 };

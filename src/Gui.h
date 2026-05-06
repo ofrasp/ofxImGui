@@ -117,11 +117,14 @@ struct ofxImGuiContext {
 
 namespace ofxImGui
 {
+    // Note: values are written as plain integers rather than bit-shift expressions (1<<1 etc.)
+    // because older compilers (e.g. GCC on Raspberry Pi / armv7) reject non-trivial
+    // constant expressions as enum initialisers in some language modes.
     enum SetupState : unsigned char {
-        SetupError = 0, // Keep to 0 so that it evaluates to false ?
-        SetupSlave = 2,
-        SetupMaster = 4,
-        SetupSuccess = 6, // Use like: if(mState & Success)
+        Error   = 0, // 0b000  - evaluates to false; setup did not succeed
+        Slave   = 2, // 0b010  (1 << 1) - joined an existing context as a slave
+        Master  = 4, // 0b100  (1 << 2) - created and owns the context
+        Success = 6, // 0b110  (Slave | Master) - use like: if(state & Success)
     };
 
 	std::ostream& operator<<(std::ostream& os, const SetupState& _state);

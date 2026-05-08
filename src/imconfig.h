@@ -303,5 +303,5 @@ namespace ImGui
 #ifndef IMGUI_TEST_ENGINE_ENABLE_CAPTURE
 #define IMGUI_TEST_ENGINE_ENABLE_CAPTURE 0
 #endif
-#include "../../ofxImGuiTestSuite/libs/imgui_test_engine/imgui_te_imconfig.h"
+#include "imgui_te_imconfig.h"
 #endif

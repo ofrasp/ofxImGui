@@ -90,8 +90,16 @@ glm::vec2 Viewport::worldToScreen(const glm::vec3& worldPt) const {
 
 glm::vec2 Viewport::screenToWorld(const glm::vec2& screenPt) const {
     if (!cam_) return screenPt;
-    glm::vec3 w = cam_->screenToWorld(glm::vec3(screenPt.x, screenPt.y, 0.f));
-    return { w.x, w.y };
+    // Unproject two points at different screen depths, then ray-march to z=0.
+    // Using z=0 (near plane) alone gives the wrong answer for a perspective cam.
+    // Note: 'near'/'far' are Windows macros — use p0/p1 to avoid expansion.
+    glm::vec3 p0 = cam_->screenToWorld(glm::vec3(screenPt.x, screenPt.y, 0.f));
+    glm::vec3 p1 = cam_->screenToWorld(glm::vec3(screenPt.x, screenPt.y, 1.f));
+    float dz = p1.z - p0.z;
+    if (std::abs(dz) < 1e-6f) return { p0.x, p0.y }; // orthographic / degenerate
+    float t = -p0.z / dz;         // t where the ray crosses z=0
+    glm::vec3 world = glm::mix(p0, p1, t);
+    return { world.x, world.y };
 }
 
 // ---------------------------------------------------------------------------

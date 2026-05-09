@@ -42,6 +42,10 @@ void appendCharToPressedChars(const char theChar, char (&lastPressedChars)[OFXIM
         i++;
     }
 }
+#endif // OFXIMGUI_DEBUG
+
+#ifdef OFXIMGUI_BACKEND_GLFW
+#include <GLFW/glfw3.h>
 #endif
 
 //#ifdef OFXIMGUI_BACKEND_GLFW
@@ -250,6 +254,24 @@ namespace ofxImGui
 		if(!bDebugWindowBoundToOF){
 			ofAddListener(ofEvents().keyPressed, this, &Gui::recordOfKeyPresses, OF_EVENT_ORDER_BEFORE_APP);
 			bDebugWindowBoundToOF = true;
+		}
+#endif
+
+		// Apply OS content scale for HiDPI / 4K displays (GLFW backend only).
+		// FontGlobalScale upscales the already-rasterised atlas; for sharper results
+		// rebuild fonts at (size * scale) instead. ScaleAllSizes keeps padding/rounding
+		// proportional. Both are no-ops when xscale == 1 (non-HiDPI displays).
+#ifdef OFXIMGUI_BACKEND_GLFW
+		{
+			GLFWwindow* glfwWin = (GLFWwindow*)_ofWindow->getWindowContext();
+			if (glfwWin) {
+				float xs = 1.f, ys = 1.f;
+				glfwGetWindowContentScale(glfwWin, &xs, &ys);
+				if (xs > 1.f) {
+					io.FontGlobalScale = xs;
+					ImGui::GetStyle().ScaleAllSizes(xs);
+				}
+			}
 		}
 #endif
 
